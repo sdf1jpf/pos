@@ -11,7 +11,8 @@ import { queuePosting } from "../posting";
 import { cents, dollars } from "../money";
 import type { PosCtx } from "../screens/types";
 import { laneScreen, newSale, onLane, readQty, showQty, signOn } from "./common";
-import type { DiscountState, FunctionsState, ReceiptState, SaleState, TenderState } from "./types";
+import { runCard } from "../data/cardterm";
+import type { CardState, DiscountState, FunctionsState, ReceiptState, SaleState, TenderState } from "./types";
 
 const MAX_LINES = 60;
 const MAX_COUPONS = 5;
@@ -260,10 +261,8 @@ export const tender = onLane(panel<TenderState, Env>({
 		scr.input(f + 1, 14, 9, "amount", dollars(Math.abs(due)), { bright: s.errField === "amount" });
 		label(scr, f + 2, 2, "REF    ===>");
 		scr.input(f + 2, 14, 19, "ref", "", { bright: s.errField === "ref" });
-		scr.text(f + 2, 35, refund ? "CARD: LAST 4  CREDIT: BLANK FOR NEW" : "CARD: LAST 4  CHECK NO.  GIFT/CREDIT NO.", { color: "blue" });
-		label(scr, f + 3, 2, "AUTH   ===>");
-		scr.input(f + 3, 14, 10, "auth", "", { bright: s.errField === "auth" });
-		scr.text(f + 3, 26, "CARD: THE APPROVAL CODE FROM THE CARD TERMINAL", { color: "blue" });
+		scr.text(f + 2, 35, refund ? "CREDIT: BLANK FOR NEW" : "CHECK NO.  GIFT/CREDIT NO.", { color: "blue" });
+		scr.text(f + 3, 2, "CARD GOES TO THE CARD TERMINAL FOR THE CUSTOMER", { color: "blue" });
 		message(scr, s.msg ?? "");
 		keys(scr, "PF3=BACK TO SALE  PF6=REMOVE LAST TENDER  ENTER=APPLY");
 		scr.cursorTo(s.errField ?? "method");
@@ -305,11 +304,10 @@ export const tender = onLane(panel<TenderState, Env>({
 			return fail("amount", refund ? `2315E THE REFUND IS AT MOST ${dollars(owed)}` : `2306E A ${kind} CAN PAY AT MOST THE ${dollars(owed)} DUE`);
 		}
 		const ref = (inp.fields.ref ?? "").trim().toUpperCase();
-		const auth = (inp.fields.auth ?? "").trim().toUpperCase();
-		if (kind === "CARD" && !/^\d{4}$/.test(ref)) return fail("ref", "2307E KEY THE CARD'S LAST 4 DIGITS");
-		if (kind === "CARD" && !/^[A-Z0-9]{2,10}$/.test(auth)) return fail("auth", "2308E KEY THE APPROVAL CODE FROM THE CARD TERMINAL");
 		if (kind === "CHECK" && !/^\d{1,8}$/.test(ref)) return fail("ref", "2309E KEY THE CHECK NUMBER");
 		if (sale.tenders.length >= 8) return fail("method", "2310E A SALE TAKES AT MOST 8 TENDERS");
+		// The card terminal reads the card and gives the last 4 and approval.
+		if (kind === "CARD") return { p: "card", lane: s.lane, back: s, amount, refund } satisfies CardState;
 		let number = ref;
 		if (kind === "GIFT" || kind === "CREDIT") {
 			if (refund && kind === "CREDIT" && !ref) number = newCreditNumber();
@@ -332,14 +330,76 @@ export const tender = onLane(panel<TenderState, Env>({
 		const applied = refund ? amount : Math.min(amount, owed);
 		const x: Tender = {
 			kind, amount: sign * applied, tendered: sign * (refund ? applied : amount),
-			...(kind !== "CASH" ? { ref: number } : {}), ...(kind === "CARD" ? { auth } : {}),
+			...(kind !== "CASH" ? { ref: number } : {}),
 		};
-		sale.tenders.push(x);
-		if (applied < owed) {
-			s.msg = `${msgId(ctx, "2311I")} ${x.kind} ${dollars(applied)} ${refund ? "REFUNDED" : "APPLIED"} - ${dollars(owed - applied)} STILL ${refund ? "TO REFUND" : "DUE"}`;
+		return apply(ctx, s, priced, x, amount);
+	},
+}));
+
+// apply adds a tender, completing the sale when nothing is left to pay or
+// refund. amount is what the customer handed over, for change.
+function apply(ctx: PosCtx, s: TenderState, priced: Priced, x: Tender, amount: number) {
+	const owed = Math.abs(priced.total - paid(s.back.tenders));
+	const applied = Math.abs(x.amount);
+	const refund = x.amount < 0;
+	s.back.tenders.push(x);
+	if (applied < owed) {
+		s.msg = `${msgId(ctx, "2311I")} ${x.kind} ${dollars(applied)} ${refund ? "REFUNDED" : "APPLIED"} - ${dollars(owed - applied)} STILL ${refund ? "TO REFUND" : "DUE"}`;
+		return s;
+	}
+	return complete(ctx, s, priced, amount - applied, true);
+}
+
+// POS231 CARD TERMINAL: the amount sent to the card terminal, waiting on
+// the customer. The terminal is simulated: Enter is the customer presenting
+// a card, PF10 one that is declined. Approved, the tender carries the card's
+// last 4 and approval code from the terminal; declined, nothing is taken.
+
+export const card = onLane(panel<CardState, Env>({
+	async render(ctx, s) {
+		const scr = laneScreen(ctx, "POS231", "CARD TERMINAL", s.lane);
+		label(scr, 5, 4, s.refund ? "REFUND TO CARD" : "CHARGE TO CARD");
+		scr.text(5, 22, lpad(dollars(s.amount), 10), { color: "white", bright: true });
+		scr.text(7, 4, "+--------------------------------------+", { color: "turquoise" });
+		scr.text(8, 4, "|                                      |", { color: "turquoise" });
+		scr.text(9, 4, `|  ${pad(`${s.refund ? "REFUND" : "TOTAL"} $${dollars(s.amount)}`, 36)}|`, { color: "turquoise" });
+		scr.text(10, 4, "|  INSERT, TAP OR SWIPE CARD           |", { color: "turquoise" });
+		scr.text(11, 4, "|                                      |", { color: "turquoise" });
+		scr.text(12, 4, "+--------------------------------------+", { color: "turquoise" });
+		scr.text(14, 4, "THE CUSTOMER PAYS ON THE TERMINAL. IT GIVES THE REGISTER THE CARD'S", { color: "blue" });
+		scr.text(15, 4, "LAST 4 AND THE APPROVAL CODE. THIS TERMINAL IS SIMULATED.", { color: "blue" });
+		message(scr, s.msg ?? "");
+		keys(scr, s.refund ? "ENTER=CUSTOMER PRESENTS CARD  PF3=CANCEL" : "ENTER=CUSTOMER PRESENTS CARD  PF10=CARD DECLINES  PF3=CANCEL");
+		return scr;
+	},
+
+	async handle(ctx, s, inp) {
+		s.msg = undefined;
+		const back = s.back;
+		back.msg = back.errField = undefined;
+		if (inp.aid === pf(3) || inp.aid === pf(12)) {
+			back.msg = `${msgId(ctx, "2307W")} CARD CANCELLED - NOTHING CHARGED`;
+			return back;
+		}
+		if (inp.aid !== "ENTER" && inp.aid !== pf(10)) {
+			s.msg = invalidKey(ctx, inp.aid);
 			return s;
 		}
-		return complete(ctx, s, priced, amount - applied, true);
+		const priced = await priceSale(ctx, back.back);
+		const due = priced.total - paid(back.back.tenders);
+		// The sale can't change while the terminal waits, but check anyway.
+		if (due === 0 || due < 0 !== s.refund || s.amount > Math.abs(due)) {
+			back.msg = `${msgId(ctx, "2308W")} THE BALANCE CHANGED - TENDER AGAIN`;
+			return back;
+		}
+		const r = runCard(s.amount, s.refund, inp.aid === pf(10));
+		if (!r.approved) {
+			back.msg = `${msgId(ctx, "2340E")} ${r.brand} ****${r.last4} DECLINED - ${r.reason}. ASK FOR ANOTHER CARD OR METHOD`;
+			back.errField = "method";
+			return back;
+		}
+		const sign = s.refund ? -1 : 1;
+		return apply(ctx, back, priced, { kind: "CARD", amount: sign * s.amount, tendered: sign * s.amount, ref: r.last4, auth: r.auth }, s.amount);
 	},
 }));
 
