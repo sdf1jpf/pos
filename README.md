@@ -55,16 +55,24 @@ orders, reorder points and returns to vendors).
 | POS420 | 4.2 TIME CARDS: a store's week, hours by day, worked against scheduled | managers (their stores), admins |
 | POS421 | Time card: one person's punches; change times in place, D deletes, the last line adds one, each with a reason | same |
 | POS430 | 4.3 SCHEDULE: a store's week of shifts; PF6 copies last week into the days left blank | same |
-| POSM08 | 8 ADMIN | admins |
+| POSM07 | 7 CUSTOMERS | managers, admins |
+| POS710 | 7.1 CUSTOMERS: found by name or part of the phone number; PF5 adds one | same |
+| POS711 | Customer: name, phone, email, tax exemption, status; their cards and last sales | same |
+| POS720 | 7.2 GIFT CARDS: a gift card's or store credit's balance and history; adjust it with a reason code, PF11 stops or starts it | same |
+| POSM08 | 8 ADMIN | admins, managers (audit log) |
 | POS810 | 8.1 STORES: S shows a store, R its registers | admins |
 | POS811 | Store: address, tax rate, discount limit, receipt header and footer | admins |
 | POS820 | 8.2 REGISTERS: a store's registers, changed in place, and the service token each enrolled register signs on with | admins |
+| POS830 | 8.3 AUDIT LOG: every change, newest first, by store, userid, action and date; S shows one in full | admins, managers (their stores) |
+| POS831 | Audit entry: one change, its detail in full | same |
+| POS840 | 8.4 REASON CODES: stock adjustment, price override and gift card reasons; changed in place, never deleted | admins |
 | POS200 | R REGISTER: run a register on this terminal | supervisors, managers, admins |
 
-Menu numbers follow the plan (6 REPORTS and 7 CUSTOMERS come later), so
-fast paths like `=1.3` won't move. Inventory's maps are POS31x to POS33x,
+Menu numbers follow the plan (6 REPORTS comes later), so fast paths
+like `=1.3` won't move. Inventory's maps are POS31x to POS33x,
 purchasing's POS36x to POS38x, time cards and the schedule POS42x to
-POS43x and end of day's POS51x to POS52x, since the register has POS2xx.
+POS43x, end of day's POS51x to POS52x and customers' POS71x to POS72x,
+since the register has POS2xx.
 
 Rules worth knowing:
 

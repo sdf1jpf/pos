@@ -4,8 +4,9 @@ import { Invalid } from "../data/db";
 import { getItem, listDepartments } from "../data/items";
 import {
 	adjust, cancelCount, cancelTransfer, countLines, getCount, getTransfer, ledger, listCounts, listStock, listTransfers, newCount, newTransfer,
-	onHand, postCount, readQty, REASONS, receiveTransfer, sendTransfer, setCounted, showQty,
+	onHand, postCount, readQty, receiveTransfer, sendTransfer, setCounted, showQty,
 } from "../data/stock";
+import { reasonNote, reasons } from "../data/reasons";
 import { getStore, storeNumber } from "../data/stores";
 import type { Env } from "../env";
 import { FIRST, form, guarded, listRows, refused, rowCount, rule, scroll, selected } from "./common";
@@ -169,7 +170,7 @@ export const adjustStock = guarded("inventory", panel<AdjustState, Env>({
 			{ row: 4, label: "STORE", name: "store", len: 3, value: s.store ? String(s.store) : "", numeric: true },
 			{ row: 5, label: "ITEM", name: "sku", len: 14, value: s.sku ?? "", note: it ? it.desc : "SKU OR UPC" },
 			{ row: 6, label: "CHANGE", name: "qty", len: 10, value: "", note: "+ MORE OR - FEWER, E.G. -2 (POUNDS FOR A WEIGHED ITEM)" },
-			{ row: 7, label: "REASON", name: "reason", len: 2, value: "", note: Object.entries(REASONS).map(([k, v]) => `${k}=${v}`).join(" ") },
+			{ row: 7, label: "REASON", name: "reason", len: 2, value: "", note: reasonNote(await reasons(ctx.env.DB, "ADJUST")) },
 		], s.errField);
 		if (now !== undefined) scr.text(9, 2, `ON HAND AT STORE ${s.store}: ${showQty(now, it!.weighed)}${it!.weighed ? " LB" : ""}`, { color: "turquoise" });
 		message(scr, s.msg ?? "");

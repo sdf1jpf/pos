@@ -16,6 +16,8 @@ import { receiptPanel, receipts } from "./register/receipt";
 import { returnPanel } from "./register/returns";
 import { sale, tender } from "./register/sale";
 import { laneSelect, opendrawer, signon } from "./register/signon";
+import { audit, auditRow, reasonCodes } from "./screens/audit";
+import { card, customer as customerScreen, customers } from "./screens/customers";
 import { depts } from "./screens/depts";
 import { employee, employees } from "./screens/employees";
 import { closeDay, days, zreport } from "./screens/endofday";
@@ -43,6 +45,7 @@ const app = createApp<Env>({
 		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
 		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport, timecards, timecard, schedule,
+		customers, custfile: customerScreen, card, audit, auditrow: auditRow, reasons: reasonCodes,
 		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},
@@ -100,6 +103,15 @@ const app = createApp<Env>({
 		"lane.store": { title: "STORE", lines: ["The store whose register to run on this terminal."] },
 		"lane.reg": { title: "REGISTER", lines: ["The register to run. Its sales go in its own drawer."] },
 		"signon.operator": { title: "OPERATOR ID", lines: ["The number on your employee record, 3 to 6 digits.", "Enter signs on; PF9 clocks you in, or out if you are on the clock."] },
+		"customers.q": { title: "SEARCH", lines: ["A word in the customer's name, or any part of their phone number.", "Blank lists everyone."] },
+		"custfile.phone": { title: "PHONE", lines: ["Ten digits. The register finds a customer by it, so no two", "customers share one."] },
+		"custfile.exempt": { title: "TAX EXEMPT", lines: ["Y if the customer's purchases carry no sales tax. Key their", "certificate number too."], values: yesNo },
+		"custfile.status": { title: "STATUS", lines: ["An inactive customer isn't found at the register."], values: values(["A", "ACTIVE"], ["I", "INACTIVE"]) },
+		"card.card": { title: "CARD NUMBER", lines: ["A gift card's 8 to 19 digits, or a store credit number: SC and", "12 digits, as printed on the receipt."] },
+		"card.amount": { title: "ADJUST", lines: ["An amount to add to the balance, e.g. 5.00, or to take off,", "e.g. -5.00. Needs a reason code."] },
+		"audit.action": { title: "ACTION", lines: ["The start of the action: TIME shows every time clock entry,", "SALE.VOID only post-voids. Blank shows everything."] },
+		"audit.before": { title: "ON OR BEFORE", lines: ["Show what happened on or before this day, YYYY-MM-DD.", "Blank is up to now."] },
+		"reasons.kind": { title: "KIND", lines: ["Which reasons to keep."], values: values(["ADJUST", "STOCK ADJUSTMENTS"], ["OVERRIDE", "PRICE OVERRIDES"], ["CARD", "GIFT CARD CHANGES"]) },
 		"timecards.week": { title: "WEEK OF", lines: ["Any day of the week to show, YYYY-MM-DD. Weeks run Monday to Sunday."] },
 		"timecard.reason": { title: "REASON", lines: ["Why the punches are being changed. It is kept with each punch", "changed and in the audit log."] },
 		"schedule.week": { title: "WEEK OF", lines: ["Any day of the week to schedule, YYYY-MM-DD. Weeks run Monday to Sunday."] },
