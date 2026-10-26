@@ -19,3 +19,7 @@ export interface StoreState extends PanelState { p: "store"; back: PanelState; s
 export interface RegistersState extends ListState { p: "registers"; store?: number; errField?: string }
 export interface EmployeesState extends ListState { p: "employees" }
 export interface EmployeeState extends PanelState { p: "employee"; back: PanelState; emp?: number; version?: number; errField?: string }
+export interface PromotionsState extends ListState { p: "promotions" }
+export interface PromotionState extends PanelState { p: "promotion"; back: PanelState; id?: number; version?: number; errField?: string }
+export interface CouponsState extends ListState { p: "coupons" }
+export interface CouponState extends PanelState { p: "coupon"; back: PanelState; code?: string; version?: number; errField?: string }

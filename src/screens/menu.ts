@@ -30,6 +30,8 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 			{ key: "1", name: "ITEMS", desc: "The item master", aliases: ["I"], right: "items", go: go("items") },
 			{ key: "2", name: "DEPTS", desc: "Departments", aliases: ["D"], right: "items", go: go("depts") },
 			{ key: "3", name: "PRICES", desc: "Store price books", aliases: ["PB"], right: "prices", go: go("prices") },
+			{ key: "4", name: "PROMOTIONS", desc: "Sale prices, BOGOs, mix and match", aliases: ["PR"], right: "items", go: go("promotions") },
+			{ key: "5", name: "COUPONS", desc: "Coupons the registers take", aliases: ["C"], right: "items", go: go("coupons") },
 		],
 	},
 	"8": {

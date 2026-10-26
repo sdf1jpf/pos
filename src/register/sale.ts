@@ -1,18 +1,50 @@
-import { invalidKey, keys, label, lpad, message, msgId, pad, panel, pf, withFill } from "@greenscreen-dev/worker";
+import { invalidKey, keys, label, lpad, message, msgId, pad, panel, pf, stamp, withFill } from "@greenscreen-dev/worker";
+import { coupon, couponsIn, lineAdj, price, promosFor, wholeAdj, type Priced } from "../data/pricing";
 import {
-	DrawerClosed, findItem, laneAudit, lineAmount, paid, registerInfo, totals, writeSale,
+	DrawerClosed, findItem, laneAudit, lineAmount, paid, registerInfo, writeSale,
 	type Line, type Tender, type TenderKind,
 } from "../data/register";
 import type { Env } from "../env";
 import { cents, dollars } from "../money";
 import type { PosCtx } from "../screens/types";
 import { laneScreen, newSale, onLane, readQty, showQty, signOn } from "./common";
-import type { FunctionsState, ReceiptState, SaleState, TenderState } from "./types";
+import type { DiscountState, FunctionsState, ReceiptState, SaleState, TenderState } from "./types";
 
 const MAX_LINES = 60;
+const MAX_COUPONS = 5;
 
-async function taxRate(ctx: PosCtx, s: { lane: { store: number; reg: number } }): Promise<number> {
-	return (await registerInfo(ctx.env.DB, s.lane.store, s.lane.reg))?.taxRate ?? 0;
+// The store's local time now, as promotions and coupons are dated.
+export const localNow = (ctx: PosCtx) => stamp(ctx, new Date().toISOString());
+
+// priceSale prices a sale with the store's tax rate and the promotions and
+// coupons in force now.
+export async function priceSale(ctx: PosCtx, s: SaleState): Promise<Priced> {
+	const db = ctx.env.DB;
+	const at = localNow(ctx);
+	const [r, promos, coupons] = await Promise.all([
+		registerInfo(db, s.lane.store, s.lane.reg),
+		promosFor(db, s.lane.store, at, s.lines.filter((l) => !l.void).map((l) => l.sku)),
+		couponsIn(db, at, s.coupons ?? []),
+	]);
+	return price(s.lines, promos, coupons, s.saleDisc, r?.taxRate ?? 0);
+}
+
+// One row of the sale as shown: a line as rung, or something taken off.
+interface Row { n?: number; sku?: string; desc: string; qty?: string; price?: string; amount: string; t?: boolean; void?: boolean; off?: boolean }
+
+function rows(s: SaleState, p: Priced): Row[] {
+	const out: Row[] = [];
+	s.lines.forEach((l, i) => {
+		out.push({
+			n: i + 1, sku: l.sku, desc: l.void ? `VOID ${l.desc}` : l.desc, qty: showQty(l.qty, l.weighed),
+			price: `${dollars(l.price)}${l.override ? "*" : ""}`, amount: l.void ? "VOID" : dollars(l.amount), t: l.taxable && !l.void, void: l.void,
+		});
+		for (const a of lineAdj(p.adjustments, i + 1)) out.push({ desc: `  ${a.desc}${a.kind === "LINEDISC" && a.code ? ` ${a.code}` : ""}`, amount: dollars(-a.amount), off: true });
+	});
+	for (const a of wholeAdj(p.adjustments)) {
+		out.push({ desc: a.kind === "COUPON" ? `COUPON ${a.code} ${a.desc}` : `${a.desc} ${a.code}`, amount: dollars(-a.amount), off: true });
+	}
+	return out;
 }
 
 // POS220 SALE: items keyed or scanned, one line each, with the running
@@ -32,29 +64,30 @@ export const sale = onLane(panel<SaleState, Env>({
 		scr.text(7, 2, "-".repeat(scr.cols - 3), { color: "blue" });
 		const first = 8;
 		const room = scr.rows - 5 - first + 1;
-		const from = Math.max(s.lines.length - room, 0);
-		s.lines.slice(from).forEach((l, i) => {
+		const t = await priceSale(ctx, s);
+		const shown = rows(s, t);
+		shown.slice(Math.max(shown.length - room, 0)).forEach((r, i) => {
 			const row = first + i;
-			const color = l.void ? "yellow" : "green";
-			scr.text(row, 2, lpad(from + i + 1, 2), { color: "turquoise" });
-			scr.text(row, 5, pad(l.sku, 14), { color });
-			scr.text(row, 20, pad(l.void ? `VOID ${l.desc}` : l.desc, 30), { color });
-			scr.text(row, 51, lpad(showQty(l.qty, l.weighed), 9), { color });
-			scr.text(row, 61, lpad(dollars(l.price), 8), { color });
-			scr.text(row, 70, lpad(l.void ? "VOID" : dollars(l.amount), 9), { color });
-			if (l.taxable && !l.void) scr.text(row, 80, "T", { color });
+			const color = r.void || r.off ? "yellow" : "green";
+			if (r.n) scr.text(row, 2, lpad(r.n, 2), { color: "turquoise" });
+			if (r.sku) scr.text(row, 5, pad(r.sku, 14), { color });
+			scr.text(row, r.sku ? 20 : 5, pad(r.desc, r.sku ? 30 : 45), { color });
+			if (r.qty) scr.text(row, 51, lpad(r.qty, 9), { color });
+			if (r.price) scr.text(row, 61, lpad(r.price, 8), { color });
+			scr.text(row, 70, lpad(r.amount, 9), { color });
+			if (r.t) scr.text(row, 80, "T", { color });
 		});
 		if (s.lines.length === 0) scr.text(first, 5, "READY FOR THE NEXT SALE", { color: "blue" });
-		const t = totals(s.lines, await taxRate(ctx, s));
 		scr.text(scr.rows - 4, 2, "-".repeat(scr.cols - 3), { color: "blue" });
 		scr.text(scr.rows - 3, 2, `ITEMS ${t.items}`, { color: "turquoise" });
-		scr.text(scr.rows - 3, 14, `SUBTOTAL ${lpad(dollars(t.subtotal), 9)}`, { color: "turquoise" });
-		scr.text(scr.rows - 3, 36, `TAX ${lpad(dollars(t.tax), 8)}`, { color: "turquoise" });
+		scr.text(scr.rows - 3, 12, `SUBTOTAL ${lpad(dollars(t.subtotal), 9)}`, { color: "turquoise" });
+		if (t.discount) scr.text(scr.rows - 2, 12, `SAVINGS  ${lpad(dollars(-t.discount), 9)}`, { color: "yellow" });
+		scr.text(scr.rows - 3, 34, `TAX ${lpad(dollars(t.tax), 8)}`, { color: "turquoise" });
 		scr.text(scr.rows - 3, 56, `TOTAL ${lpad(dollars(t.total), 10)}`, { color: "white", bright: true });
 		const p = paid(s.tenders);
-		if (p > 0) scr.text(scr.rows - 2, 36, `PAID ${lpad(dollars(p), 9)}   BALANCE DUE ${lpad(dollars(t.total - p), 9)}`, { color: "yellow", bright: true });
+		if (p > 0) scr.text(scr.rows - 2, 34, `PAID ${lpad(dollars(p), 9)}   BALANCE DUE ${lpad(dollars(t.total - p), 9)}`, { color: "yellow", bright: true });
 		message(scr, s.msg ?? "");
-		keys(scr, "PF2=PRICE PF3=SIGN OFF PF4=FUNCTIONS PF5=TENDER PF6=VOID LINE PF12=VOID SALE");
+		keys(scr, "PF2=PRICE PF3=SIGNOFF PF4=FUNC PF5=TENDER PF6=VOID LN PF9=DISCOUNT PF12=VOID");
 		scr.cursorTo(s.errField ?? "item");
 		return scr;
 	},
@@ -78,6 +111,7 @@ export const sale = onLane(panel<SaleState, Env>({
 					return s;
 				}
 				const it = await findItem(ctx.env.DB, s.lane.store, code);
+				if (!it && inp.aid === "ENTER" && (await coupon(ctx.env.DB, code))) return takeCoupon(ctx, s, code, fail);
 				if (!it) return fail("item", `2203E ITEM ${code} NOT FOUND`);
 				if (it === "discontinued") return fail("item", `2204E ITEM ${code} IS DISCONTINUED - IT CAN'T BE SOLD`);
 				if (inp.aid === pf(2)) {
@@ -118,12 +152,16 @@ export const sale = onLane(panel<SaleState, Env>({
 					return s;
 				}
 				try {
-					const id = await writeSale(ctx.env.DB, s.lane, s.token, s.lines, [], await taxRate(ctx, s), "X");
+					const id = await writeSale(ctx.env.DB, s.lane, s.token, s.lines, [], await priceSale(ctx, s), "X");
 					return newSale(s.lane, `${msgId(ctx, "2217I")} SALE ${id} VOIDED`);
 				} catch (e) {
 					return drawerGone(ctx, s, e);
 				}
 			}
+			case pf(9):
+				if (live.length === 0) return fail("item", "2218E RING AN ITEM FIRST");
+				if (s.tenders.length > 0) return fail("item", "2211E PAYMENT HAS STARTED - REMOVE IT FIRST (PF5, THEN PF6)");
+				return { p: "discount", lane: s.lane, back: s } satisfies DiscountState;
 			case pf(5):
 				if (live.length === 0) return fail("item", "2218E RING AN ITEM FIRST");
 				return { p: "tender", lane: s.lane, back: s } satisfies TenderState;
@@ -138,6 +176,28 @@ export const sale = onLane(panel<SaleState, Env>({
 		return s;
 	},
 }));
+
+// takeCoupon adds a coupon scanned or keyed in the item field, if it is in
+// force and comes off something in the sale.
+async function takeCoupon(ctx: PosCtx, s: SaleState, code: string, fail: (field: string, msg: string) => SaleState) {
+	const c = (await coupon(ctx.env.DB, code))!;
+	s.coupons ??= []; // a sale begun before coupons came in
+	const at = localNow(ctx);
+	if (c.status !== "A" || c.starts > at || (c.ends && c.ends <= at)) return fail("item", `2221E COUPON ${code} IS NOT GOOD TODAY`);
+	if (s.coupons.includes(code)) return fail("item", `2222E COUPON ${code} IS ALREADY TAKEN`);
+	if (s.coupons.length >= MAX_COUPONS) return fail("item", `2223E A SALE TAKES AT MOST ${MAX_COUPONS} COUPONS`);
+	if (s.tenders.length > 0) return fail("item", "2211E PAYMENT HAS STARTED - REMOVE IT FIRST (PF5, THEN PF6)");
+	s.coupons.push(code);
+	const t = await priceSale(ctx, s);
+	const off = t.adjustments.filter((a) => a.kind === "COUPON" && a.code === code).reduce((n, a) => n + a.amount, 0);
+	if (off === 0) {
+		s.coupons.pop();
+		const need = c.minTotal > 0 ? ` - THE SALE MUST COME TO ${dollars(c.minTotal)}` : c.sku ? ` - RING ITEM ${c.sku} FIRST` : c.dept !== null ? ` - RING AN ITEM FROM DEPT ${c.dept} FIRST` : "";
+		return fail("item", `2224E COUPON ${code} TAKES NOTHING OFF${need}`);
+	}
+	s.msg = `${msgId(ctx, "2225I")} COUPON ${code} ${c.desc} - ${dollars(off)} OFF`;
+	return s;
+}
 
 // A drawer closed under a sale (by a back-office close, say) can't take
 // it: the operator signs on again to a new drawer.
@@ -155,13 +215,14 @@ const KINDS: Record<string, TenderKind> = { C: "CASH", CASH: "CASH", D: "CARD", 
 export const tender = onLane(panel<TenderState, Env>({
 	async render(ctx, s) {
 		const scr = laneScreen(ctx, "POS230", "TENDER", s.lane);
-		const t = totals(s.back.lines, await taxRate(ctx, s));
+		const t = await priceSale(ctx, s.back);
 		const due = t.total - paid(s.back.tenders);
 		const row = (r: number, l: string, v: number, bright = false) => {
 			label(scr, r, 4, l);
 			scr.text(r, 20, lpad(dollars(v), 10), { color: bright ? "white" : "green", bright });
 		};
-		row(5, "SUBTOTAL", t.subtotal);
+		row(4, "SUBTOTAL", t.subtotal);
+		row(5, "SAVINGS", -t.discount);
 		row(6, "TAX", t.tax);
 		row(7, "TOTAL", t.total, true);
 		s.back.tenders.forEach((x, i) => {
@@ -206,8 +267,8 @@ export const tender = onLane(panel<TenderState, Env>({
 			s.errField = field;
 			return withFill(s, { fields: inp.fields, cursor: field });
 		};
-		const rate = await taxRate(ctx, s);
-		const due = totals(sale.lines, rate).total - paid(sale.tenders);
+		const priced = await priceSale(ctx, sale);
+		const due = priced.total - paid(sale.tenders);
 		const kind = KINDS[(inp.fields.method ?? "").trim().toUpperCase()];
 		if (!kind) return fail("method", "2304E METHOD MUST BE C (CASH), D (CARD) OR K (CHECK)");
 		const amtTyped = (inp.fields.amount ?? "").trim();
@@ -227,7 +288,7 @@ export const tender = onLane(panel<TenderState, Env>({
 			return s;
 		}
 		try {
-			const id = await writeSale(ctx.env.DB, sale.lane, sale.token, sale.lines, sale.tenders, rate, "C");
+			const id = await writeSale(ctx.env.DB, sale.lane, sale.token, sale.lines, sale.tenders, priced, "C");
 			const change = amount - x.amount;
 			return {
 				p: "receipt", lane: sale.lane, sale: id, change, back: newSale(sale.lane),

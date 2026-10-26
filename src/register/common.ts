@@ -32,7 +32,7 @@ export function signOn(store: number, reg: number, via: Lane["via"], msg?: strin
 }
 
 export function newSale(lane: Lane, msg?: string): SaleState {
-	return { p: "sale", lane, token: crypto.randomUUID(), lines: [], tenders: [], ...(msg ? { msg } : {}) };
+	return { p: "sale", lane, token: crypto.randomUUID(), lines: [], tenders: [], coupons: [], ...(msg ? { msg } : {}) };
 }
 
 // laneScreen starts a register screen: the title, and on line 3 the store,

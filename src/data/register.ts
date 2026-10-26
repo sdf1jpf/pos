@@ -4,6 +4,7 @@
 // is paid for (or cancelled), in one batch with its audit rows.
 
 import { audit, Invalid, now } from "./db";
+import { wholeAdj, type Adj, type Priced } from "./pricing";
 import { priceAt } from "./items";
 
 // A lane is a register with an operator signed on to it. It travels in the
@@ -213,6 +214,8 @@ export interface Line {
 	taxable: boolean;
 	weighed: boolean;
 	void?: boolean;
+	override?: { from: number; reason: string; approver: string }; // the price it was rung at before
+	disc?: { pct?: number; amount?: number; approver?: string }; // pct in hundredths of a percent
 }
 
 export type TenderKind = "CASH" | "CARD" | "CHECK";
@@ -227,53 +230,46 @@ export interface Tender {
 
 export const lineAmount = (qty: number, price: number) => Math.round((qty * price) / 1000);
 
-export interface Totals {
-	items: number;
-	subtotal: number;
-	tax: number;
-	total: number;
-}
-
-// totals adds up the lines not voided. Tax is the store's rate on the
-// taxable lines, rounded once for the sale.
-export function totals(lines: Line[], taxRate: number): Totals {
-	const live = lines.filter((l) => !l.void);
-	const subtotal = live.reduce((t, l) => t + l.amount, 0);
-	const taxable = live.filter((l) => l.taxable).reduce((t, l) => t + l.amount, 0);
-	const tax = Math.round((taxable * taxRate) / 100000);
-	return { items: live.length, subtotal, tax, total: subtotal + tax };
-}
-
 export const paid = (tenders: Tender[]) => tenders.reduce((t, x) => t + x.amount, 0);
 
 export class DrawerClosed extends Error {}
 
-// writeSale writes a sale, its lines and tenders, and its audit rows, once
-// per token: if the token was written already, that sale's ID comes back.
-export async function writeSale(db: D1Database, lane: Lane, token: string, lines: Line[], tenders: Tender[], taxRate: number, status: "C" | "X"): Promise<number> {
+// writeSale writes a sale, its lines, tenders and adjustments, and its
+// audit rows, once per token: if the token was written already, that
+// sale's ID comes back.
+export async function writeSale(db: D1Database, lane: Lane, token: string, lines: Line[], tenders: Tender[], t: Priced, status: "C" | "X"): Promise<number> {
 	const done = await saleByToken(db, token);
 	if (done) return done;
 	if (!lane.drawer || !(await drawerIsOpen(db, lane.drawer))) throw new DrawerClosed();
-	const t = totals(lines, taxRate);
 	const change = tenders.reduce((c, x) => c + x.tendered - x.amount, 0);
 	const at = now();
 	const id = "(SELECT id FROM sales WHERE token = ?)";
 	const a = (action: string, detail: string, approver?: string) =>
 		db.prepare(`INSERT INTO audit (at, userid, store, reg, action, subject, detail, approver) VALUES (?, ?, ?, ?, ?, CAST(${id} AS TEXT), ?, ?)`)
 			.bind(at, opUser(lane), lane.store, lane.reg, action, token, detail, approver ?? null);
+	// Each line's own adjustments, then those off the whole sale, added up
+	// (each line's net has its share).
+	const adjs = [...t.adjustments.filter((x) => !x.whole), ...wholeAdj(t.adjustments)];
+	const approved = (x: Adj) => x.approver && (x.kind === "OVERRIDE" || x.kind === "LINEDISC" || x.kind === "SALEDISC");
 	try {
 		await db.batch([
-			db.prepare(`INSERT INTO sales (token, store, reg, drawer, emp, at, subtotal, tax, total, change, status)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-				.bind(token, lane.store, lane.reg, lane.drawer, lane.emp, at, t.subtotal, t.tax, t.total, change, status),
-			...lines.map((l, i) => db.prepare(`INSERT INTO sale_lines (sale, line, sku, descr, dept, qty, price, amount, taxable, voided)
-				VALUES (${id}, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-				.bind(token, i + 1, l.sku, l.desc, l.dept, l.qty, l.price, l.amount, l.taxable ? 1 : 0, l.void ? 1 : 0)),
+			db.prepare(`INSERT INTO sales (token, store, reg, drawer, emp, at, subtotal, discount, tax, total, change, status)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+				.bind(token, lane.store, lane.reg, lane.drawer, lane.emp, at, t.subtotal, t.discount, t.tax, t.total, change, status),
+			...lines.map((l, i) => db.prepare(`INSERT INTO sale_lines (sale, line, sku, descr, dept, qty, price, amount, taxable, voided, orig_price, reason, discount, net)
+				VALUES (${id}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+				.bind(token, i + 1, l.sku, l.desc, l.dept, l.qty, l.price, l.amount, l.taxable ? 1 : 0, l.void ? 1 : 0,
+					l.override?.from ?? null, l.override?.reason ?? "", t.off[i], t.net[i])),
 			...tenders.map((x, i) => db.prepare(`INSERT INTO sale_tenders (sale, seq, kind, amount, tendered, ref, auth)
 				VALUES (${id}, ?, ?, ?, ?, ?, ?)`)
 				.bind(token, i + 1, x.kind, x.amount, x.tendered, x.ref ?? "", x.auth ?? "")),
+			...adjs.map((x, i) => db.prepare(`INSERT INTO sale_adjustments (sale, seq, kind, line, code, descr, amount, approver)
+				VALUES (${id}, ?, ?, ?, ?, ?, ?, ?)`)
+				.bind(token, i + 1, x.kind, x.line ?? null, x.code, x.desc, x.amount, x.approver ?? null)),
 			...lines.flatMap((l, i) => (l.void ? [a("SALE.LINEVOID", `line=${i + 1} sku=${l.sku} amount=${l.amount}`)] : [])),
-			a(status === "C" ? "SALE.COMPLETE" : "SALE.CANCEL", `total=${t.total} lines=${t.items}`),
+			...adjs.filter(approved).map((x) => a(x.kind === "OVERRIDE" ? "SALE.OVERRIDE" : "SALE.DISCOUNT",
+				`line=${x.line ?? ""} ${x.kind} ${x.code} amount=${x.amount}`.replace(/\s+/g, " "), x.approver)),
+			a(status === "C" ? "SALE.COMPLETE" : "SALE.CANCEL", `total=${t.total} discount=${t.discount} lines=${t.items}`),
 		]);
 	} catch (e) {
 		if (!(e instanceof Error && /UNIQUE constraint failed: sales.token/.test(e.message))) throw e;
@@ -295,30 +291,40 @@ export interface Sale {
 	cashier: string;
 	at: string;
 	subtotal: number;
+	discount: number;
 	tax: number;
 	total: number;
 	change: number;
 	status: "C" | "X" | "V";
 	voidedAt: string | null;
-	lines: Line[];
+	lines: (Line & { net: number })[];
 	tenders: Tender[];
+	adjustments: Adj[];
 }
 
 export async function getSale(db: D1Database, id: number): Promise<Sale | undefined> {
-	const [s, l, t] = await db.batch<Record<string, unknown>>([
+	const [s, l, t, j] = await db.batch<Record<string, unknown>>([
 		db.prepare(`SELECT s.id, s.store, s.reg, s.drawer, s.emp, COALESCE(e.operator, '') AS operator, e.name AS cashier, s.at,
-				s.subtotal, s.tax, s.total, s.change, s.status, s.voided_at AS voidedAt
+				s.subtotal, s.discount, s.tax, s.total, s.change, s.status, s.voided_at AS voidedAt
 			FROM sales s JOIN employees e ON e.emp = s.emp WHERE s.id = ?`).bind(id),
-		db.prepare(`SELECT sku, descr AS desc, dept, qty, price, amount, taxable, voided FROM sale_lines WHERE sale = ? ORDER BY line`).bind(id),
+		db.prepare(`SELECT sku, descr AS desc, dept, qty, price, amount, taxable, voided, orig_price AS orig, reason, COALESCE(net, amount) AS net
+			FROM sale_lines WHERE sale = ? ORDER BY line`).bind(id),
 		db.prepare("SELECT kind, amount, tendered, ref, auth FROM sale_tenders WHERE sale = ? ORDER BY seq").bind(id),
+		db.prepare("SELECT kind, line, code, descr AS desc, amount, approver FROM sale_adjustments WHERE sale = ? ORDER BY seq").bind(id),
 	]);
-	const sale = s.results[0] as Omit<Sale, "lines" | "tenders"> | undefined;
+	const sale = s.results[0] as Omit<Sale, "lines" | "tenders" | "adjustments"> | undefined;
 	if (!sale) return undefined;
-	const lines = (l.results as (Omit<Line, "taxable" | "void" | "weighed"> & { taxable: number; voided: number })[]).map((x) => ({
-		sku: x.sku, desc: x.desc, dept: x.dept, qty: x.qty, price: x.price, amount: x.amount,
+	type Row = Omit<Line, "taxable" | "void" | "weighed" | "override"> & { taxable: number; voided: number; orig: number | null; reason: string; net: number };
+	const lines = (l.results as Row[]).map((x) => ({
+		sku: x.sku, desc: x.desc, dept: x.dept, qty: x.qty, price: x.price, amount: x.amount, net: x.net,
 		taxable: x.taxable === 1, weighed: x.qty % 1000 !== 0, ...(x.voided ? { void: true } : {}),
+		...(x.orig !== null ? { override: { from: x.orig, reason: x.reason, approver: "" } } : {}),
 	}));
-	return { ...sale, lines, tenders: t.results as unknown as Tender[] };
+	type AdjRow = Omit<Adj, "line" | "approver"> & { line: number | null; approver: string | null };
+	const adjustments = (j.results as unknown as AdjRow[]).map((x): Adj => ({
+		kind: x.kind, code: x.code, desc: x.desc, amount: x.amount, ...(x.line !== null ? { line: x.line } : { whole: true }), ...(x.approver ? { approver: x.approver } : {}),
+	}));
+	return { ...sale, lines, tenders: t.results as unknown as Tender[], adjustments };
 }
 
 export interface SaleRow {

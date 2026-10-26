@@ -10,7 +10,8 @@ import { registerForToken } from "./data/register";
 import type { Env } from "./env";
 import { signOn } from "./register/common";
 import { closedrawer, functions, paid } from "./register/drawer";
-import { approve, receiptPanel, receipts } from "./register/receipt";
+import { approve, discount } from "./register/discount";
+import { receiptPanel, receipts } from "./register/receipt";
 import { sale, tender } from "./register/sale";
 import { laneSelect, opendrawer, signon } from "./register/signon";
 import { depts } from "./screens/depts";
@@ -18,6 +19,7 @@ import { employee, employees } from "./screens/employees";
 import { item, items } from "./screens/items";
 import { menu } from "./screens/menu";
 import { prices } from "./screens/prices";
+import { coupon, coupons, promotion, promotions } from "./screens/promos";
 import { registers, store, stores } from "./screens/stores";
 
 export type { Env };
@@ -32,8 +34,8 @@ const app = createApp<Env>({
 		banner: ["GREENSCREEN POINT OF SALE", "BACK OFFICE"],
 	},
 	programs: {
-		menu, items, item, depts, prices, stores, store, registers, employees, employee,
-		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve,
+		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
+		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 	},
 	// People sign on through Cloudflare Access as their userid. A register
 	// signs on with its own service token, as the token's client ID.
@@ -76,6 +78,15 @@ const app = createApp<Env>({
 				["ADMIN", "EVERYTHING, INCLUDING STORES AND EMPLOYEES"],
 			),
 		},
+		"promotion.kind": {
+			title: "KIND",
+			lines: ["What the promotion does to the items it names."],
+			values: values(["SALE", "EACH (OR POUND) AT THE PRICE"], ["BOGO", "BUY QTY, GET MORE AT A PERCENT OFF"], ["MIX", "ANY QTY OF THE ITEMS FOR THE PRICE"]),
+		},
+		"promotion.items": { title: "ITEMS", lines: ["The SKUs on promotion, separated by commas. A line takes at most", "one promotion, and none once its price is overridden or discounted."] },
+		"coupon.value": { title: "VALUE", lines: ["A percent off (10%) or an amount off (2.00), from the item, the", "department's items, or the whole sale."] },
+		"discount.disc": { title: "DISCOUNT", lines: ["A percent (10%) or an amount (2.00) off the line, or a percent off", "the whole sale with LINE blank. 0 takes a discount off. Over the", "store's limit, a supervisor or manager approves it."] },
+		"discount.reason": { title: "REASON", lines: ["Why the price is overridden."], values: values(["PM", "PRICE MATCH"], ["AD", "AD PRICE"], ["MK", "MISMARKED"], ["DM", "DAMAGED"], ["MG", "MANAGER'S CALL"]) },
 		"employee.pin": { title: "REGISTER PIN", lines: ["Four digits the person keys with their operator ID to sign on at a", "register or approve an override. Setting one unlocks someone locked", "out after three wrong PINs. Blank leaves the PIN as it is."] },
 		"lane.store": { title: "STORE", lines: ["The store whose register to run on this terminal."] },
 		"lane.reg": { title: "REGISTER", lines: ["The register to run. Its sales go in its own drawer."] },

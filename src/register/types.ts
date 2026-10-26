@@ -2,6 +2,7 @@
 // to it) travels in every one of them, in the signed commarea.
 
 import type { PanelState } from "@greenscreen-dev/worker";
+import type { SaleDisc } from "../data/pricing";
 import type { Closed, Counts, Lane, Line, Tender } from "../data/register";
 
 export interface LaneSelectState extends PanelState { p: "lane"; back: PanelState; errField?: string }
@@ -15,6 +16,8 @@ export interface SaleState extends PanelState {
 	token: string; // writes the sale once
 	lines: Line[];
 	tenders: Tender[];
+	coupons: string[]; // codes, in the order taken
+	saleDisc?: SaleDisc;
 	voiding?: boolean; // PF12 pressed once: again voids the sale
 	errField?: string;
 }
@@ -26,6 +29,23 @@ export interface ReceiptsState extends PanelState {
 export interface FunctionsState extends PanelState { p: "functions"; lane: Lane; back: SaleState; errField?: string }
 export interface PaidState extends PanelState { p: "paid"; lane: Lane; back: SaleState; kind: "PAIDIN" | "PAIDOUT"; token: string; errField?: string }
 export interface CloseDrawerState extends PanelState { p: "closedrawer"; lane: Lane; back: SaleState; counts: Counts; closed?: Closed; errField?: string }
+export interface DiscountState extends PanelState { p: "discount"; lane: Lane; back: SaleState; errField?: string }
+
+// A discount or override waiting for approval. line is 1-based; none is
+// the sale discount.
+export interface Pending {
+	line?: number;
+	pct?: number; // hundredths of a percent
+	amount?: number;
+	price?: number; // a price override
+	reason?: string;
+	what: string; // what is being approved, for the screen and the audit
+}
+
 // A supervisor's or manager's approval of what the operator may not do
-// alone, then the action approved.
-export interface ApproveState extends PanelState { p: "approve"; lane: Lane; back: PanelState; action: "postvoid"; sale: number; errField?: string }
+// alone, then the action approved: a post-void of a paid sale, or a
+// discount or price override on the sale being rung (in back.back).
+export type ApproveState = PanelState & { p: "approve"; lane: Lane; back: PanelState; errField?: string } & (
+	| { action: "postvoid"; sale: number }
+	| { action: "adjust"; back: DiscountState; pending: Pending }
+);

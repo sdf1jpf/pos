@@ -10,8 +10,9 @@ The plan, in five phases, is the "Greenscreen POS: scope and design" doc.
 Phase 1 laid the foundation: the master-data schema, sign-on through
 Cloudflare Access with roles, and the back-office panels for stores,
 registers, items, departments, price books and employees. Phase 2 is the
-register; its core is here (sign-on, drawers, sales, tenders, receipts and
-post-voids), with discounts, returns and the rest to follow.
+register: sign-on, drawers, sales, tenders, receipts and post-voids, then
+discounts, price overrides, coupons and promotions, with returns and the
+rest to follow.
 
 ## The back office
 
@@ -23,6 +24,8 @@ post-voids), with discounts, returns and the rest to follow.
 | POS111 | Item: add or update; PF1 in DEPARTMENT lists them | buyers, admins |
 | POS120 | 1.2 DEPTS: departments, changed in place | buyers, admins |
 | POS130 | 1.3 PRICES: a store's price book; a store's own price overrides the base price | buyers, admins, managers (their stores) |
+| POS140 | 1.4 PROMOTIONS: sale prices, buy-X-get-Y and mix and match, by store and time, applied by the registers themselves | buyers, admins |
+| POS150 | 1.5 COUPONS: codes the registers take, off an item, a department or the sale | buyers, admins |
 | POS410 | 4 EMPLOYEES: people, roles, userids, operator IDs, stores | admins |
 | POS411 | Employee: add or update | admins |
 | POSM08 | 8 ADMIN | admins |
@@ -65,11 +68,12 @@ Durable Object).
 | POS210 | Sign on: operator ID and 4-digit PIN. Three wrong PINs lock the operator out until an admin sets a new PIN (POS411) |
 | POS211 | Open the drawer: the float, counted by denomination; PF10 opens it |
 | POS220 | Sale: scan or key a SKU or UPC, a quantity or a weight in pounds. PF2 checks a price, PF6 voids a line, PF12 (twice) voids the sale |
+| POS227 | Discount (PF9): a percent or amount off a line, a percent off the sale, or a line's price overridden with a reason |
 | POS230 | Tender: cash (with change), card (last 4 and approval code; recorded, not charged) or check, split as the customer likes |
 | POS240 | Receipt, with the receipt number store-register-sale and its barcode text |
 | POS225 | Functions between sales: receipts, paid in, paid out, no sale, close drawer, sign off |
 | POS241 | The register's receipts: S reprints, V voids a paid sale |
-| POS290 | Manager approval: a supervisor's, manager's or admin's operator ID and PIN |
+| POS290 | Manager approval: a supervisor's, manager's or admin's operator ID and PIN, for a post-void, a discount over the store's limit or any price override |
 | POS250 | Close the drawer: counted blind, then expected, over/short, card and check totals |
 
 Rules worth knowing:
@@ -81,7 +85,13 @@ Rules worth knowing:
 - **Drawers.** One open drawer per register, shared by the operators who
   sign on to it. It should hold its float, plus cash taken, plus paid in,
   less paid out; a post-voided sale no longer counts.
-- **Tax** is the store's rate on the taxable lines, rounded once per sale.
+- **Pricing** (`src/data/pricing.ts`) works in a fixed order on each
+  line: a price override replaces the price; then one promotion (not on
+  an overridden or discounted line); the line's own discount; item and
+  department coupons; the sale discount; sale coupons, spread over the
+  lines. A coupon is scanned or keyed in the item field.
+- **Tax** is the store's rate on what the taxable lines come to after
+  discounts, rounded once per sale.
 - **Quantities** are kept in thousandths, so a pound and a half of apples
   is 1500 and two mugs are 2000.
 - **Enrolling a register:** create a service token in Cloudflare Zero
