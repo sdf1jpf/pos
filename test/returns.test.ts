@@ -54,18 +54,22 @@ describe("returns", () => {
 		expect(text(r)).toContain("REFUND DUE");
 		r = await t.key("ENTER", { method: "K" });
 		expect(text(r)).toContain("POS2313E");
-		r = await t.key("ENTER", { method: "C" });
+		r = await t.key("ENTER", { method: "D" });
+		expect(map(r)).toBe("POS231");
+		expect(text(r)).toContain("REFUND TO CARD");
+		expect(text(r)).not.toContain("PF10");
+		r = await t.key("ENTER");
 		expect(map(r)).toBe("POS240");
 		const ret = saleId(r);
 		r = await t.key("PF8");
 		expect(text(r)).toContain(`RETURN FROM ${sold} LINE 1`);
-		expect(text(r)).toContain("REFUND CASH");
+		expect(text(r)).toMatch(/REFUND CARD \*{4}\d{4} AUTH/);
 		await t.key("ENTER");
 
 		const back = await env.DB.prepare("SELECT total, tax FROM sales WHERE id = ?").bind(ret).first();
 		expect(back).toEqual({ total: -642, tax: -43 });
 		const tender = await env.DB.prepare("SELECT kind, amount FROM sale_tenders WHERE sale = ?").bind(ret).first();
-		expect(tender).toEqual({ kind: "CASH", amount: -642 });
+		expect(tender).toEqual({ kind: "CARD", amount: -642 });
 		const line = await env.DB.prepare("SELECT returned FROM sale_lines WHERE sale = ? AND line = 1").bind(sold).first();
 		expect(line).toEqual({ returned: 1000 });
 

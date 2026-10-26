@@ -14,7 +14,7 @@ import { approve, discount } from "./register/discount";
 import { customer, gift, resumePanel } from "./register/extras";
 import { receiptPanel, receipts } from "./register/receipt";
 import { returnPanel } from "./register/returns";
-import { sale, tender } from "./register/sale";
+import { card, sale, tender } from "./register/sale";
 import { laneSelect, opendrawer, signon } from "./register/signon";
 import { depts } from "./screens/depts";
 import { employee, employees } from "./screens/employees";
@@ -43,7 +43,7 @@ const app = createApp<Env>({
 		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
 		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport, timecards, timecard, schedule,
-		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
+		lane: laneSelect, signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},
 	// People sign on through Cloudflare Access as their userid. A register
@@ -107,8 +107,8 @@ const app = createApp<Env>({
 		"sale.item": { title: "ITEM", lines: ["Scan the barcode, or key the SKU or UPC, and press Enter.", "PF2 shows the price without ringing it."] },
 		"sale.qty": { title: "QTY", lines: ["How many, 1 to 999; blank is 1. For an item sold by weight, the", "pounds from the scale, e.g. 1.25."] },
 		"sale.line": { title: "LINE", lines: ["The line number to void with PF6. Blank voids the last line."] },
-		"tender.method": { title: "METHOD", lines: ["How the customer pays this part."], values: values(["C", "CASH"], ["D", "CARD (RECORDED; RUN IT ON THE CARD TERMINAL)"], ["K", "CHECK"], ["G", "GIFT CARD"], ["S", "STORE CREDIT"]) },
-		"tender.ref": { title: "REFERENCE", lines: ["A card's last 4 digits, a check number, or a gift card or store", "credit number. Refunding to store credit, blank issues a new one."] },
+		"tender.method": { title: "METHOD", lines: ["How the customer pays this part."], values: values(["C", "CASH"], ["D", "CARD, ON THE CARD TERMINAL"], ["K", "CHECK"], ["G", "GIFT CARD"], ["S", "STORE CREDIT"]) },
+		"tender.ref": { title: "REFERENCE", lines: ["A check number, or a gift card or store credit number. Refunding", "to store credit, blank issues a new one. A card needs none: the card", "terminal gives its last 4 and approval code."] },
 		"tender.amount": { title: "AMOUNT", lines: ["How much this part pays, or refunds. Cash may be more than is due:", "the change is shown. Nothing else pays more than is due."] },
 		"functions.option": { title: "OPTION", lines: ["The register function to go to."], values: values(["1", "RECEIPTS"], ["2", "PAID IN"], ["3", "PAID OUT"], ["4", "NO SALE"], ["5", "CLOSE DRAWER"], ["6", "SIGN OFF"],
 			["7", "CUSTOMER"], ["8", "RETURN"], ["9", "GIFT CARD"], ["10", "SUSPEND THE SALE"], ["11", "RESUME A SALE"]) },

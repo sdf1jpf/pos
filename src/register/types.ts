@@ -23,6 +23,9 @@ export interface SaleState extends PanelState {
 	errField?: string;
 }
 export interface TenderState extends PanelState { p: "tender"; lane: Lane; back: SaleState; errField?: string }
+// A card tender waiting on the card terminal. amount is in cents, positive
+// for a refund too.
+export interface CardState extends PanelState { p: "card"; lane: Lane; back: TenderState; amount: number; refund: boolean }
 export interface ReceiptState extends PanelState { p: "receipt"; lane: Lane; back: PanelState; sale: number; change?: number; top?: number }
 export interface ReceiptsState extends PanelState {
 	p: "receipts"; lane: Lane; back: PanelState; top?: number; total?: number; keys?: string[]; errSel?: string;
