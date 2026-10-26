@@ -52,6 +52,13 @@ supervisor's approval.
 **Between sales.** PF4 has receipts (reprint, or post-void a paid sale
 with approval), paid in, paid out, no sale, sign off and resume.
 
+**The customer display.** A screen facing the customer shows each item
+as you ring it, the savings, tax and total, "insert, tap or swipe" while
+the card terminal waits, and the change at the end. To pair one, open
+`/display` on it (a register Mac with two monitors does this itself): it
+shows a 6-digit code. Press PF4, option 12, key the code and press Enter.
+It stays paired; PF6 on the same screen unpairs it.
+
 **Closing the drawer.** At the end of the day, PF4 then close drawer.
 Count the cash by denomination first; only then does the register show
 what it expected and the over or short.
@@ -99,7 +106,8 @@ enroll a register, create a service token in Cloudflare Zero Trust, add it
 to the Access application's Service Auth policy, and key its client ID
 beside the register on 8.2 REGISTERS. On a Mac,
 `scripts/make-mac-app.sh --register` makes that register an app for the
-Dock (see the README).
+Dock (see the README). With a second monitor it opens the customer
+display there too, full screen, beside the register.
 
 **Products.** 1.1 ITEMS is the item master. 1.3 PRICES is each store's
 price book, 1.4 PROMOTIONS and 1.5 COUPONS what the registers take off.

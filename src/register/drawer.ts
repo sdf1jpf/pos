@@ -6,7 +6,7 @@ import { cents, dollars } from "../money";
 import type { PosCtx } from "../screens/types";
 import { laneScreen, newSale, onLane, signOn } from "./common";
 import { priceSale, localNow } from "./sale";
-import type { CloseDrawerState, CustomerState, FunctionsState, GiftState, PaidState, ReceiptsState, ResumeState, ReturnState, SaleState } from "./types";
+import type { CloseDrawerState, CustomerState, DisplayState, FunctionsState, GiftState, PaidState, ReceiptsState, ResumeState, ReturnState, SaleState } from "./types";
 
 // countForm draws a denomination count: bills on the left, coins on the
 // right, each with what it comes to, and the total.
@@ -40,7 +40,7 @@ export function readCountsInto(ctx: PosCtx, s: { counts: Counts; msg?: string; e
 
 // POS225 REGISTER FUNCTIONS, between sales.
 
-// The first six are for between sales; the rest work during one too.
+// The first six (and 11) are for between sales; the rest work during one too.
 const OPTIONS = [
 	["1", "RECEIPTS", "Reprint a receipt, or void a sale (with a manager)"],
 	["2", "PAID IN", "Cash put in the drawer, with a reason"],
@@ -53,6 +53,7 @@ const OPTIONS = [
 	["9", "GIFT CARD", "Sell or load a gift card; PF2 there for a balance"],
 	["10", "SUSPEND", "Put this sale aside to finish later today"],
 	["11", "RESUME", "Finish a sale suspended at this store today"],
+	["12", "DISPLAY", "Pair a customer display to this register"],
 ] as const;
 
 export const functions = onLane(panel<FunctionsState, Env>({
@@ -111,6 +112,8 @@ export const functions = onLane(panel<FunctionsState, Env>({
 				return suspendSale(ctx, s.back);
 			case "11":
 				return { p: "resume", lane, back: s.back } satisfies ResumeState;
+			case "12":
+				return { p: "display", lane, back: s.back } satisfies DisplayState;
 		}
 		s.msg = `${msgId(ctx, "2252E")} ${opt ? `INVALID OPTION ${opt}` : "KEY AN OPTION"}`;
 		s.errField = "option";

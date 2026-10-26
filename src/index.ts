@@ -5,6 +5,7 @@
 import { accessAuth, createApp, helpTable, msgId, serviceTokenAuth, time, user, userIdFor, values, type Auth } from "@greenscreen-dev/worker";
 import { tso } from "@greenscreen-dev/worker/sessions";
 import { who } from "./access";
+import { displayRoutes, onDisplay } from "./display";
 import { clerkByUserid } from "./data/employees";
 import { listDepartments } from "./data/items";
 import { reasons, type Kind } from "./data/reasons";
@@ -16,6 +17,7 @@ import { closedrawer, functions, paid } from "./register/drawer";
 import { approve, discount } from "./register/discount";
 import { customer, gift, resumePanel } from "./register/extras";
 import { lookup } from "./register/lookup";
+import { pairDisplay } from "./register/pairing";
 import { receiptPanel, receipts } from "./register/receipt";
 import { returnPanel } from "./register/returns";
 import { card, sale, tender } from "./register/sale";
@@ -60,8 +62,12 @@ const app = createApp<Env>({
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
 		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport, timecards, timecard, schedule,
 		customers, custfile: customerScreen, giftcard, audit, auditrow: auditRow, reasons: reasonCodes, reports, report,
-		lane: laneSelect, clerklane: clerkLane, signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
-		return: returnPanel, customer, gift, resume: resumePanel, lookup,
+		lane: laneSelect, clerklane: clerkLane,
+		// The register's panels show on its customer display.
+		...onDisplay({
+			signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
+			return: returnPanel, customer, gift, resume: resumePanel, lookup, display: pairDisplay,
+		}),
 	},
 	auth,
 	// A register enrolled with its service token goes to its sign-on screen.
@@ -140,7 +146,8 @@ const app = createApp<Env>({
 		"tender.ref": { title: "REFERENCE", lines: ["A check number, or a gift card or store credit number. Refunding", "to store credit, blank issues a new one. A card needs none: the card", "terminal gives its last 4 and approval code."] },
 		"tender.amount": { title: "AMOUNT", lines: ["How much this part pays, or refunds. Cash may be more than is due:", "the change is shown. Nothing else pays more than is due."] },
 		"functions.option": { title: "OPTION", lines: ["The register function to go to."], values: values(["1", "RECEIPTS"], ["2", "PAID IN"], ["3", "PAID OUT"], ["4", "NO SALE"], ["5", "CLOSE DRAWER"], ["6", "SIGN OFF"],
-			["7", "CUSTOMER"], ["8", "RETURN"], ["9", "GIFT CARD"], ["10", "SUSPEND THE SALE"], ["11", "RESUME A SALE"]) },
+			["7", "CUSTOMER"], ["8", "RETURN"], ["9", "GIFT CARD"], ["10", "SUSPEND THE SALE"], ["11", "RESUME A SALE"], ["12", "PAIR A CUSTOMER DISPLAY"]) },
+		"display.code": { title: "CODE", lines: ["The 6 digits the customer display shows. Open /display on it (the", "register launcher does) to get one; a code is good for 15 minutes."] },
 		"return.receipt": { title: "RECEIPT", lines: ["Scan the receipt's barcode or key its number, e.g. 1-01-000123."] },
 		"customer.phone": { title: "PHONE", lines: ["The customer's 10-digit phone number. Not on file, you're asked", "for their name to add them."] },
 		"customer.exempt": { title: "TAX EXEMPT", lines: ["Y if the customer's purchases carry no sales tax. Key their", "certificate number too."], values: yesNo },
@@ -169,6 +176,9 @@ app.get("/v1/report.pdf", app.signedOn, (c) => reportPdf(c.env, user(c), new URL
 // A store server's sync with the cloud (src/sync.ts).
 app.get("/v1/sync", app.signedOn, (c) => pull(c.env, user(c), new URL(c.req.url)));
 app.post("/v1/sync", app.signedOn, (c) => push(c.env, user(c), c.req.raw));
+
+// The customer display: its page, pairing and WebSocket (src/display.ts).
+displayRoutes(app);
 
 async function reasonValues(db: D1Database, kind: Kind) {
 	return Object.entries(await reasons(db, kind)).map(([code, desc]) => ({ code, desc }));

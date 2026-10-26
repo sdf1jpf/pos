@@ -153,6 +153,7 @@ Durable Object).
 | POS234 | Customer: found by phone, or added; a tax-exempt customer's sale carries no tax |
 | POS235 | Gift card: sold or reloaded (5.00 to 500.00) as a line on the sale; PF2 shows a card's balance |
 | POS236 | Resume: the sales suspended at this store today, resumed at any of its registers |
+| POS238 | Customer display (functions, option 12): pair a customer display by the code it shows; PF6 unpairs the register's displays |
 | POS241 | The register's receipts: S reprints, V voids a paid sale |
 | POS290 | Manager approval: a supervisor's, manager's or admin's operator ID and PIN, for a post-void, a discount over the store's limit or any price override |
 | POS250 | Close the drawer: counted blind, then expected, over/short, card and check totals |
@@ -181,10 +182,47 @@ Rules worth knowing:
   discounts, rounded once per sale.
 - **Quantities** are kept in thousandths, so a pound and a half of apples
   is 1500 and two mugs are 2000.
+- **Customer display.** A screen facing the customer, paired to a
+  register (see below).
 - **Enrolling a register:** create a service token in Cloudflare Zero
   Trust, add it to the Access application's Service Auth policy, and key
   its client ID beside the register on POS820. The terminal on that lane
   then signs on with the token.
+
+## The customer display
+
+A tablet, or a second monitor on the register, can face the customer and
+show the sale as it is rung: each line (with its quantity and price, and
+what came off it), the savings, tax and total, what has been paid and
+what's still due, the card terminal's "insert, tap or swipe" while it
+waits, then a thank-you with the change. Between sales it welcomes the
+customer by the store's name and the cashier's; with nobody signed on it
+says the register is closed.
+
+- **Opening one.** Browse to `/display` on the POS (the cloud's URL, or
+  `http://<the store server>:8080/display`). The page shows a 6-digit
+  code, good for 15 minutes. At the register, PF4, option 12 (POS238):
+  key the code. The display keeps a token in the browser, so it stays
+  paired through restarts until PF6 on POS238 unpairs it. Pairing and
+  unpairing are in the audit log (`REG.DISPLAY.PAIR`, `REG.DISPLAY.UNPAIR`).
+- **On a Mac with two monitors,** a register app made by
+  `scripts/make-mac-app.sh --register` opens the terminal full screen on
+  the main monitor and the display full screen on the other (see "On a
+  Mac").
+- **How it's pushed.** Each register has a `Display` Durable Object
+  (`src/display.ts`). Every time a register panel is shown, the Worker
+  works out what the register's display should show and gives it to that
+  register's object, which sends it over a hibernating WebSocket
+  (`GET /v1/display/ws`) to the displays paired to it, only when it
+  changed. A register with no display paired skips all of that. A display
+  that can't be reached never holds up the register.
+- **Who can see it.** The page and its API (`/display`, `/v1/display`)
+  aren't signed on by the app: a display proves itself with its token,
+  which it only gets paired by a clerk at a register. In the cloud, Access
+  is in front of them like everything else, so either sign the display's
+  browser in through Access once, or (better for a screen no one logs in
+  to) add `/display` and `/v1/display` to the Bypass policy (see Deploy).
+  A store server has no Access, so a display on its network just works.
 
 ## In-store mode
 
@@ -224,7 +262,8 @@ up is in [store/README.md](store/README.md).
 ```
 src/index.ts         the app: panels, logon check, field help
 src/access.ts        who is signed on, their role and stores
-src/worker.ts        the Worker's entry: the app, the posting queue and cron, the Sessions Durable Object
+src/worker.ts        the Worker's entry: the app, the posting queue and cron, the Sessions and Display Durable Objects
+src/display.ts       the customer display: what it shows, its Durable Object and routes (src/displaypage.ts is the page)
 src/posting.ts       posting paid sales to the stock ledger
 src/sync.ts          in-store mode: a store server's sync with the cloud (src/data/sync.ts has the SQL)
 src/closeday.ts      the Workflow that closes a store's day
@@ -318,6 +357,15 @@ CF_ACCESS_CLIENT_ID=... CF_ACCESS_CLIENT_SECRET=... \
 scripts/make-mac-app.sh --register LANE1 http://store-server:8080   # the same, on a store server
 ```
 
+A register app takes the whole Mac: the terminal goes full screen on the
+main monitor and, with a second monitor, the customer display goes full
+screen on that one, in Chrome (or Edge, or Chromium) in kiosk mode, with
+its own browser profile so it stays paired. Pair it once at the register
+(PF4, option 12). `--no-display` leaves it out:
+`scripts/make-mac-app.sh --register LANE1 --no-display`. macOS asks, the
+first time, to let the app control the computer (System Settings, Privacy
+& Security, Accessibility): that's what puts Terminal in full screen.
+
 A register app keeps its service token inside the app, readable only by
 you; build it on the register's own Mac. The window uses the Terminal
 profile named by `PROFILE` (default GoTerm) and is 100 by 32. Run the
@@ -336,7 +384,8 @@ the Worker and smoke-tests it. One-time setup:
    Worker's hostname (`greenscreen-pos.justin-frank.workers.dev`), with an Allow policy for the people who use the back
    office and a Service Auth policy for a service token (for the smoke
    test). Add a Bypass policy on `/v1/health` and `/v1/screen/info`, so
-   the terminals can title their logon screen. Its audience tag is
+   the terminals can title their logon screen, and on `/display` and
+   `/v1/display` for the customer displays (they pair with a code instead). Its audience tag is
    `ACCESS_AUD` in `wrangler.jsonc`; without one, the Worker refuses every
    request.
 4. **GitHub secrets** (in the `production` environment):
