@@ -48,6 +48,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Create the posting queue if it isn't there
+        run: |
+          npx wrangler queues info greenscreen-pos-posting > /dev/null 2>&1 && exit 0
+          npx wrangler queues create greenscreen-pos-posting || {
+            echo "::error::Couldn't create the greenscreen-pos-posting queue: give CLOUDFLARE_API_TOKEN Queues edit (see README)"
+            exit 1
+          }
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply greenscreen-pos --remote
       - name: Deploy Worker

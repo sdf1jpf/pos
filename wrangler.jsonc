@@ -20,6 +20,14 @@
 	// greenscreen's Sessions Durable Object.
 	"durable_objects": { "bindings": [{ "name": "SESSIONS", "class_name": "Sessions" }] },
 	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sessions"] }],
+	// Paid sales are posted to the stock ledger through a queue, and a sweep
+	// every five minutes posts any the queue missed. The deploy creates the
+	// queue if it isn't there.
+	"queues": {
+		"producers": [{ "binding": "POSTING", "queue": "greenscreen-pos-posting" }],
+		"consumers": [{ "queue": "greenscreen-pos-posting", "max_batch_size": 20, "max_batch_timeout": 2, "max_retries": 10 }]
+	},
+	"triggers": { "crons": ["*/5 * * * *"] },
 	// Cloudflare Access guards the back office; the Worker verifies its JWT.
 	// ACCESS_AUD is the audience tag of the Access application for
 	// greenscreen-pos.justin-frank.workers.dev (see README).

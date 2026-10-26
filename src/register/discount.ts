@@ -3,6 +3,7 @@ import { Invalid } from "../data/db";
 import { approves, checkPin } from "../data/pins";
 import { pctText } from "../data/pricing";
 import { getSale, lineAmount, postVoid } from "../data/register";
+import { queuePosting } from "../posting";
 import { getStore } from "../data/stores";
 import type { Env } from "../env";
 import { cents, dollars } from "../money";
@@ -195,6 +196,7 @@ export const approve = onLane(panel<ApproveState, Env>({
 		}
 		try {
 			await postVoid(ctx.env.DB, s.lane, s.sale, { emp: got.op.emp, op: got.op.operator });
+			await queuePosting(ctx.env, s.sale);
 		} catch (e) {
 			if (!(e instanceof Invalid)) throw e;
 			return { ...s.back, msg: `${msgId(ctx, "2906E")} ${e.message}` };

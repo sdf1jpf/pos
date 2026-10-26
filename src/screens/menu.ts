@@ -17,6 +17,7 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 		title: "BACK OFFICE",
 		options: [
 			{ key: "1", name: "PRODUCTS", desc: "Items, depts, prices", aliases: ["P"], sub: "1" },
+			{ key: "2", name: "INVENTORY", desc: "On hand, counts, transfers", aliases: ["IN"], sub: "2" },
 			{ key: "4", name: "EMPLOYEES", desc: "People and roles", aliases: ["E"], right: "employees", go: go("employees") },
 			{ key: "8", name: "ADMIN", desc: "Stores and registers", aliases: ["A"], sub: "8" },
 			{ key: "R", name: "REGISTER", desc: "Run a register on this terminal", right: "register", go: go("lane") },
@@ -32,6 +33,16 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 			{ key: "3", name: "PRICES", desc: "Store price books", aliases: ["PB"], right: "prices", go: go("prices") },
 			{ key: "4", name: "PROMOTIONS", desc: "Sale prices, BOGOs, mix and match", aliases: ["PR"], right: "items", go: go("promotions") },
 			{ key: "5", name: "COUPONS", desc: "Coupons the registers take", aliases: ["C"], right: "items", go: go("coupons") },
+		],
+	},
+	"2": {
+		map: "POSM02",
+		title: "INVENTORY",
+		options: [
+			{ key: "1", name: "ON HAND", desc: "Stock by store, and its ledger", aliases: ["OH"], right: "inventory", go: go("stock") },
+			{ key: "2", name: "ADJUST", desc: "Damage, shrink, found", aliases: ["A"], right: "inventory", go: (_ctx, back) => ({ p: "adjust", back, token: crypto.randomUUID() }) },
+			{ key: "3", name: "COUNTS", desc: "Cycle and full counts", aliases: ["C"], right: "inventory", go: go("counts") },
+			{ key: "4", name: "TRANSFERS", desc: "Stock sent between stores", aliases: ["T"], right: "inventory", go: go("transfers") },
 		],
 	},
 	"8": {
@@ -61,7 +72,7 @@ const built = new Map<string, ReturnType<typeof menuProgram<Env>>>();
 
 async function menuOf(ctx: PosCtx) {
 	const w = await who(ctx);
-	const rights = (["items", "prices", "stores", "employees", "register"] as const).filter((r) => can(w, r));
+	const rights = (["items", "prices", "inventory", "stores", "employees", "register"] as const).filter((r) => can(w, r));
 	const key = rights.join(",");
 	let m = built.get(key);
 	if (!m) {

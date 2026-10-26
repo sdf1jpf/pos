@@ -23,3 +23,11 @@ export interface PromotionsState extends ListState { p: "promotions" }
 export interface PromotionState extends PanelState { p: "promotion"; back: PanelState; id?: number; version?: number; errField?: string }
 export interface CouponsState extends ListState { p: "coupons" }
 export interface CouponState extends PanelState { p: "coupon"; back: PanelState; code?: string; version?: number; errField?: string }
+export interface StockState extends ListState { p: "stock"; store?: number; q?: string; dept?: number; errField?: string }
+export interface LedgerState extends PanelState { p: "ledger"; back: PanelState; store: number; sku: string; top?: number; total?: number }
+// token names the adjustment, so Enter pressed twice adjusts once.
+export interface AdjustState extends PanelState { p: "adjust"; back: PanelState; store?: number; sku?: string; token: string; errField?: string }
+export interface CountsState extends ListState { p: "counts"; store?: number; errField?: string }
+export interface CountState extends ListState { p: "count"; id: number }
+export interface TransfersState extends ListState { p: "transfers" }
+export interface TransferState extends PanelState { p: "transfer"; back: PanelState; id?: number; errField?: string } // no id: starting one
