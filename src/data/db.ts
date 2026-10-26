@@ -37,6 +37,10 @@ export const SPAN = 10_000_000_000;
 export const nextId = (table: string) =>
 	`(SELECT COALESCE(MAX(id), (SELECT base FROM site)) + 1 FROM ${table} WHERE id > (SELECT base FROM site) AND id <= (SELECT base FROM site) + ${SPAN})`;
 
+// siteNo is such an id as people see it: L123 for one numbered on a store
+// server.
+export const siteNo = (id: number) => `${id > SPAN ? "L" : ""}${id % SPAN}`;
+
 // audit returns the statement that writes an audit row, to batch with the
 // change it records so that both are written or neither.
 export function audit(db: D1Database, userid: string, a: Audit, at = now()): D1PreparedStatement {

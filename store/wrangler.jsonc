@@ -1,0 +1,17 @@
+// The store server: the same Worker as ../wrangler.jsonc, run on a machine
+// in the store by store/server.mjs, on its own database. No queue, no
+// Workflow and no cron: the cloud posts sales and closes days, and
+// server.mjs runs the sync. Its settings are in store/.dev.vars (see
+// .dev.vars.example).
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "greenscreen-pos-store",
+	"main": "../src/worker.ts",
+	"compatibility_date": "2026-10-01",
+	"assets": { "directory": "../node_modules/@greenscreen-dev/web/public" },
+	"d1_databases": [
+		{ "binding": "DB", "database_name": "greenscreen-pos-store", "database_id": "local", "migrations_dir": "../migrations" }
+	],
+	"durable_objects": { "bindings": [{ "name": "SESSIONS", "class_name": "Sessions" }] },
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sessions"] }]
+}

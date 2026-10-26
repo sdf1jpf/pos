@@ -2,7 +2,7 @@
 // Cloudflare Workers and D1. Every screen is a panel in src/screens; the
 // data they keep is in src/data; @greenscreen-dev/worker does the rest.
 
-import { accessAuth, createApp, helpTable, msgId, time, user, userIdFor, values } from "@greenscreen-dev/worker";
+import { accessAuth, createApp, helpTable, msgId, serviceTokenAuth, time, user, userIdFor, values, type Auth } from "@greenscreen-dev/worker";
 import { tso } from "@greenscreen-dev/worker/sessions";
 import { who } from "./access";
 import { clerkByUserid } from "./data/employees";
@@ -34,10 +34,19 @@ import { po, pos, reorder, suggested, vendor, vendorReturn, vendors } from "./sc
 import { coupon, coupons, promotion, promotions } from "./screens/promos";
 import { registers, store, stores } from "./screens/stores";
 import { schedule, timecard, timecards } from "./screens/timeclock";
+import { pull, push } from "./sync";
 
 export type { Env };
 
 const yesNo = values(["Y", "YES"], ["N", "NO"]);
+
+// People sign on through Cloudflare Access as their userid. A register
+// signs on with its own service token, as the token's client ID. A store
+// server has no Access in front of it: it checks its registers' service
+// tokens itself.
+const access = accessAuth<Env>((claims) => (claims.email ? userIdFor(claims) : (claims.common_name ?? "SERVICE").toLowerCase()));
+const tokens = serviceTokenAuth<Env>((env) => (env.REGISTER_TOKENS ? (JSON.parse(env.REGISTER_TOKENS) as Record<string, string>) : undefined));
+const auth: Auth<Env> = (env, req) => (env.STORE ? tokens(env, req) : access(env, req));
 
 const app = createApp<Env>({
 	app: {
@@ -54,9 +63,7 @@ const app = createApp<Env>({
 		lane: laneSelect, clerklane: clerkLane, signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel, lookup,
 	},
-	// People sign on through Cloudflare Access as their userid. A register
-	// signs on with its own service token, as the token's client ID.
-	auth: accessAuth<Env>((claims) => (claims.email ? userIdFor(claims) : (claims.common_name ?? "SERVICE").toLowerCase())),
+	auth,
 	// A register enrolled with its service token goes to its sign-on screen.
 	// Otherwise only people on the employee file (or in ADMIN_USERS) get past
 	// logon, to the back office.
@@ -158,6 +165,10 @@ const app = createApp<Env>({
 
 // A report printed to PDF (PF10 on a report), for the signed-on user.
 app.get("/v1/report.pdf", app.signedOn, (c) => reportPdf(c.env, user(c), new URL(c.req.url)));
+
+// A store server's sync with the cloud (src/sync.ts).
+app.get("/v1/sync", app.signedOn, (c) => pull(c.env, user(c), new URL(c.req.url)));
+app.post("/v1/sync", app.signedOn, (c) => push(c.env, user(c), c.req.raw));
 
 async function reasonValues(db: D1Database, kind: Kind) {
 	return Object.entries(await reasons(db, kind)).map(([code, desc]) => ({ code, desc }));

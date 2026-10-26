@@ -1,6 +1,6 @@
 import { invalidKey, keys, label, lpad, message, msgId, pad, panel, pf, stamp, withFill } from "@greenscreen-dev/worker";
 import { getCard, giftNumber, newCreditNumber, showPhone } from "../data/customers";
-import { Invalid } from "../data/db";
+import { Invalid, siteNo } from "../data/db";
 import { coupon, couponsIn, lineAdj, price, promosFor, wholeAdj, type Priced } from "../data/pricing";
 import {
 	DrawerClosed, findItem, laneAudit, lineAmount, paid, registerInfo, writeSale,
@@ -247,7 +247,7 @@ async function takeCoupon(ctx: PosCtx, s: SaleState, code: string, fail: (field:
 // it: the operator signs on again to a new drawer.
 function drawerGone(ctx: PosCtx, s: SaleState, e: unknown) {
 	if (!(e instanceof DrawerClosed)) throw e;
-	return signOn(s.lane.store, s.lane.reg, s.lane.via, `${msgId(ctx, "2220E")} DRAWER ${s.lane.drawer} IS CLOSED - SIGN ON AGAIN`);
+	return signOn(s.lane.store, s.lane.reg, s.lane.via, `${msgId(ctx, "2220E")} DRAWER ${siteNo(s.lane.drawer ?? 0)} IS CLOSED - SIGN ON AGAIN`);
 }
 
 // POS230 TENDER: payment, in as many parts as the customer likes. Cash can

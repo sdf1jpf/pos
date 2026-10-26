@@ -8,10 +8,12 @@ import app from "../src/index";
 export interface Field { row: number; col: number; text?: string; name?: string; value?: string; modified?: boolean }
 export interface Reply { state?: string; screen?: { map: string; fields: Field[] }; logoff?: { message: string } }
 
-export function terminal(user: string) {
+// opts.env stands in for the Worker's bindings (a store server's, say),
+// and opts.headers go with every request (a register's service token).
+export function terminal(user: string, opts: { env?: object; headers?: Record<string, string> } = {}) {
 	let state = "";
 	let last: Reply = {};
-	const e = { ...env, DEV_USER: user };
+	const e = { ...(opts.env ?? env), DEV_USER: user };
 	async function key(aid: string, fields: Record<string, string> = {}, cursor = ""): Promise<Reply> {
 		// Like a real terminal, send every input field on the screen, with
 		// what was typed over the ones named.
@@ -23,6 +25,7 @@ export function terminal(user: string) {
 		];
 		const res = await app.request("/v1/screen", {
 			method: "POST",
+			headers: opts.headers,
 			body: JSON.stringify({ v: 1, aid, state, fields: { ...all, ...fields }, modified, cursor: { row: 1, col: 1, field: cursor }, rows: 24, cols: 80 }),
 		}, e);
 		expect(res.status).toBe(200);

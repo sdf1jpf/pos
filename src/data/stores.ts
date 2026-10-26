@@ -21,6 +21,7 @@ export interface Store {
 	footer1: string;
 	footer2: string;
 	status: Status;
+	serverToken: string; // the client ID of the service token its store server signs on with, or ""
 	version: number;
 	updatedAt: string;
 	updatedBy: string;
@@ -29,7 +30,7 @@ export interface Store {
 // StoreInput is a store as typed on the screen, before it is checked.
 export type StoreInput = Record<
 	"store" | "name" | "addr1" | "addr2" | "city" | "state" | "zip" | "phone" | "taxRate" | "discountLimit" |
-	"header1" | "header2" | "footer1" | "footer2" | "status",
+	"header1" | "header2" | "footer1" | "footer2" | "status" | "serverToken",
 	string
 >;
 
@@ -42,7 +43,7 @@ export interface Register {
 }
 
 const COLS = `store, name, addr1, addr2, city, state, zip, phone, tax_rate AS taxRate, discount_limit AS discountLimit,
-	header1, header2, footer1, footer2, status, version, updated_at AS updatedAt, updated_by AS updatedBy`;
+	header1, header2, footer1, footer2, status, COALESCE(server_token, '') AS serverToken, version, updated_at AS updatedAt, updated_by AS updatedBy`;
 
 export async function listStores(db: D1Database): Promise<Store[]> {
 	return (await db.prepare(`SELECT ${COLS} FROM stores ORDER BY store`).all<Store>()).results;
@@ -76,8 +77,14 @@ export function checkStore(inp: StoreInput): Omit<Store, "version" | "updatedAt"
 	if (!/^\d{1,3}$/.test(dl) || discountLimit > 100) throw new Invalid("discountLimit", "DISCOUNT LIMIT MUST BE 0 TO 100 PERCENT");
 	const status = text(inp.status, 1) || "A";
 	if (status !== "A" && status !== "I") throw new Invalid("status", "STATUS MUST BE A (ACTIVE) OR I (INACTIVE)");
+	let serverToken: string;
+	try {
+		serverToken = checkToken(inp.serverToken ?? "");
+	} catch (e) {
+		throw e instanceof Invalid ? new Invalid("serverToken", e.message) : e;
+	}
 	return {
-		store, name, state, zip, taxRate, discountLimit, status,
+		store, name, state, zip, taxRate, discountLimit, status, serverToken,
 		addr1: text(inp.addr1, 30), addr2: text(inp.addr2, 30), city: text(inp.city, 20), phone: text(inp.phone, 14),
 		header1: text(inp.header1, 38), header2: text(inp.header2, 38), footer1: text(inp.footer1, 38), footer2: text(inp.footer2, 38),
 	};
@@ -90,12 +97,12 @@ export async function addStore(db: D1Database, userid: string, inp: StoreInput):
 	const at = now();
 	await unique(db.batch([
 		db.prepare(`INSERT INTO stores (store, name, addr1, addr2, city, state, zip, phone, tax_rate, discount_limit,
-			header1, header2, footer1, footer2, status, updated_at, updated_by)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+			header1, header2, footer1, footer2, status, server_token, updated_at, updated_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 			.bind(s.store, s.name, s.addr1, s.addr2, s.city, s.state, s.zip, s.phone, s.taxRate, s.discountLimit,
-				s.header1, s.header2, s.footer1, s.footer2, s.status, at, userid),
+				s.header1, s.header2, s.footer1, s.footer2, s.status, s.serverToken || null, at, userid),
 		audit(db, userid, { action: "STORE.ADD", subject: String(s.store), store: s.store, detail: s.name }, at),
-	]), new Invalid("store", `STORE ${s.store} ALREADY EXISTS`));
+	]).catch(tokenTaken), new Invalid("store", `STORE ${s.store} ALREADY EXISTS`));
 	return (await getStore(db, s.store))!;
 }
 
@@ -107,16 +114,16 @@ export async function updateStore(db: D1Database, userid: string, version: numbe
 	const at = now();
 	const [upd] = await db.batch([
 		db.prepare(`UPDATE stores SET name = ?, addr1 = ?, addr2 = ?, city = ?, state = ?, zip = ?, phone = ?, tax_rate = ?,
-			discount_limit = ?, header1 = ?, header2 = ?, footer1 = ?, footer2 = ?, status = ?,
+			discount_limit = ?, header1 = ?, header2 = ?, footer1 = ?, footer2 = ?, status = ?, server_token = ?,
 			version = version + 1, updated_at = ?, updated_by = ? WHERE store = ? AND version = ?`)
 			.bind(s.name, s.addr1, s.addr2, s.city, s.state, s.zip, s.phone, s.taxRate, s.discountLimit,
-				s.header1, s.header2, s.footer1, s.footer2, s.status, at, userid, s.store, version),
+				s.header1, s.header2, s.footer1, s.footer2, s.status, s.serverToken || null, at, userid, s.store, version),
 		audit(db, userid, {
 			action: "STORE.UPDATE", subject: String(s.store), store: s.store,
 			detail: diff(before, { ...before, ...s }, ["name", "addr1", "addr2", "city", "state", "zip", "phone", "taxRate",
-				"discountLimit", "header1", "header2", "footer1", "footer2", "status"]),
+				"discountLimit", "header1", "header2", "footer1", "footer2", "status", "serverToken"]),
 		}, at),
-	]);
+	]).catch(tokenTaken);
 	if (changed(upd) === 0) throw new Conflict(`STORE ${s.store} WAS CHANGED BY SOMEONE ELSE - REVIEW AND RETRY`);
 	return (await getStore(db, s.store))!;
 }
@@ -143,6 +150,15 @@ export async function addRegister(db: D1Database, userid: string, store: number,
 		audit(db, userid, { action: "REGISTER.ADD", subject: `${store}/${r.reg}`, store, reg: r.reg, detail: r.name }, at),
 	]), new Invalid("reg", `REGISTER ${r.reg} ALREADY EXISTS IN STORE ${store}`));
 	return { store, reg: r.reg, name: r.name, status: "A", token: "" };
+}
+
+// tokenTaken turns a server token already another store's into an error
+// on its field.
+function tokenTaken(e: unknown): never {
+	if (e instanceof Error && /UNIQUE constraint failed: stores.server_token/.test(e.message)) {
+		throw new Invalid("serverToken", "THAT TOKEN IS ANOTHER STORE'S SERVER");
+	}
+	throw e;
 }
 
 // checkToken checks an Access service token client ID as typed: 32 hex

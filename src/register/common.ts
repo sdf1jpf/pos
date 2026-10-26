@@ -2,6 +2,7 @@
 // the register so one terminal at a time runs it, and starting a sale.
 
 import { header, newScreen, pad, panel, type PanelState, type Program, type Screen } from "@greenscreen-dev/worker";
+import { siteNo } from "../data/db";
 import type { Lane } from "../data/register";
 import type { Env } from "../env";
 import type { PosCtx } from "../screens/types";
@@ -47,7 +48,7 @@ export function laneScreen(ctx: PosCtx, map: string, title: string, lane: Pick<L
 	header(scr, ctx, title);
 	scr.text(3, 2, `STORE ${lane.store}  REG ${two(lane.reg)}`, { color: "turquoise" });
 	if (lane.op) scr.text(3, 20, pad(`OPERATOR ${lane.op} ${lane.name}`, 40), { color: "turquoise" });
-	if (lane.drawer) scr.text(3, scr.cols - 13, `DRAWER ${lane.drawer}`.padStart(12), { color: "turquoise" });
+	if (lane.drawer) scr.text(3, scr.cols - 13, `DRAWER ${siteNo(lane.drawer)}`.padStart(12), { color: "turquoise" });
 	return scr;
 }
 

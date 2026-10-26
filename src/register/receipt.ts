@@ -1,5 +1,5 @@
 import { clock, invalidKey, keys, lpad, message, msgId, pad, panel, pf } from "@greenscreen-dev/worker";
-import { SPAN } from "../data/db";
+import { siteNo, SPAN } from "../data/db";
 import { getCard, getCustomer, type Customer } from "../data/customers";
 import { lineAdj, wholeAdj } from "../data/pricing";
 import { getSale, listSales, type Sale } from "../data/register";
@@ -22,7 +22,7 @@ export const receiptNo = (s: Pick<Sale, "store" | "reg" | "id">) =>
 	`${s.store}-${two(s.reg)}-${s.id > SPAN ? "L" : ""}${String(s.id % SPAN).padStart(6, "0")}`;
 
 // saleNo is a sale's number in messages: L123 for one rung on a store server.
-export const saleNo = (id: number) => `${id > SPAN ? "L" : ""}${id % SPAN}`;
+export const saleNo = siteNo;
 
 // receipt lays out a sale as the 40-column receipt printer would.
 // cards holds the balances of the gift cards and store credit on it.
