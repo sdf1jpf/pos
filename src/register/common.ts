@@ -23,7 +23,12 @@ export function onLane<S extends Held>(p: Program<S, Env>): Program<S, Env> {
 	return panel<S, Env>({
 		...p,
 		locks: (s) => [laneLock(where(s).store, where(s).reg)],
-		unlocked: (s) => (where(s).via === "office" ? { p: "menu" } : signOn(where(s).store, where(s).reg, "device")),
+		unlocked: (s) => {
+			const via = where(s).via;
+			if (via === "office") return { p: "menu" };
+			if (via === "clerk") return { p: "clerklane", msg: `REGISTER ${where(s).reg} WAS TAKEN BY ANOTHER TERMINAL` };
+			return signOn(where(s).store, where(s).reg, "device");
+		},
 	});
 }
 

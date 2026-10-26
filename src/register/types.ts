@@ -6,6 +6,8 @@ import type { SaleDisc } from "../data/pricing";
 import type { Closed, Counts, Lane, Line, Tender } from "../data/register";
 
 export interface LaneSelectState extends PanelState { p: "lane"; back: PanelState; errField?: string }
+// A clerk signed on through Access, choosing their register.
+export interface ClerkLaneState extends PanelState { p: "clerklane"; errField?: string }
 // No lane yet: the register being signed on to. back is the back office
 // menu when the register was opened from there.
 export interface SignOnState extends PanelState { p: "signon"; store: number; reg: number; via: Lane["via"]; errField?: string }

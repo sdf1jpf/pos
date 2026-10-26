@@ -15,7 +15,7 @@ export interface Lane {
 	emp: number;
 	op: string; // operator ID
 	name: string;
-	via: "device" | "office"; // an enrolled register, or opened from the back office
+	via: "device" | "office" | "clerk"; // an enrolled register, opened from the back office, or by a clerk signed on through Access
 	drawer?: number;
 }
 
