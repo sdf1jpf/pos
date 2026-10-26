@@ -27,10 +27,20 @@ export interface Audit {
 	approver?: string;
 }
 
+// Each database owns SPAN ids of the tables rung at the till (sales,
+// drawers, audit and the rest): the cloud 1 to SPAN, and a store server
+// from its site base (store x SPAN) up, so a row sent up from a store keeps
+// its id. nextId is the SQL for a table's next id here, to insert with the
+// row.
+export const SPAN = 10_000_000_000;
+
+export const nextId = (table: string) =>
+	`(SELECT COALESCE(MAX(id), (SELECT base FROM site)) + 1 FROM ${table} WHERE id > (SELECT base FROM site) AND id <= (SELECT base FROM site) + ${SPAN})`;
+
 // audit returns the statement that writes an audit row, to batch with the
 // change it records so that both are written or neither.
 export function audit(db: D1Database, userid: string, a: Audit, at = now()): D1PreparedStatement {
-	return db.prepare("INSERT INTO audit (at, userid, store, reg, action, subject, detail, approver) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+	return db.prepare(`INSERT INTO audit (id, at, userid, store, reg, action, subject, detail, approver) VALUES (${nextId("audit")}, ?, ?, ?, ?, ?, ?, ?, ?)`)
 		.bind(at, userid, a.store ?? null, a.reg ?? null, a.action, a.subject, a.detail ?? "", a.approver ?? null);
 }
 

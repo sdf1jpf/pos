@@ -3,7 +3,7 @@
 // A sale is rung up in the screen's state and written once, whole, when it
 // is paid for (or cancelled), in one batch with its audit rows.
 
-import { audit, Invalid, now } from "./db";
+import { audit, Invalid, nextId, now } from "./db";
 import { wholeAdj, type Adj, type Priced } from "./pricing";
 import { priceAt } from "./items";
 
@@ -96,8 +96,8 @@ export async function openDrawer(db: D1Database, lane: Lane, counts: Counts): Pr
 	try {
 		await db.batch([
 			// The drawer belongs to the store's business day.
-			db.prepare(`INSERT INTO drawers (store, reg, opened_at, opened_by, opening, counts, day)
-				VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(NULLIF(business_day, ''), date('now')) FROM stores WHERE store = ?))`)
+			db.prepare(`INSERT INTO drawers (id, store, reg, opened_at, opened_by, opening, counts, day)
+				VALUES (${nextId("drawers")}, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(NULLIF(business_day, ''), date('now')) FROM stores WHERE store = ?))`)
 				.bind(lane.store, lane.reg, at, lane.emp, opening, JSON.stringify(counts), lane.store),
 			audit(db, opUser(lane), { action: "DRAWER.OPEN", subject: `${lane.store}/${lane.reg}`, detail: `opening=${opening}`, store: lane.store, reg: lane.reg }, at),
 		]);
@@ -168,7 +168,7 @@ export async function drawerMove(db: D1Database, lane: Lane, token: string, kind
 	const at = now();
 	try {
 		await db.batch([
-			db.prepare("INSERT INTO drawer_moves (token, drawer, at, emp, kind, amount, reason) VALUES (?, ?, ?, ?, ?, ?, ?)")
+			db.prepare(`INSERT INTO drawer_moves (id, token, drawer, at, emp, kind, amount, reason) VALUES (${nextId("drawer_moves")}, ?, ?, ?, ?, ?, ?, ?)`)
 				.bind(token, lane.drawer, at, lane.emp, kind, amount, reason),
 			audit(db, opUser(lane), {
 				action: `DRAWER.${kind}`, subject: String(lane.drawer), detail: kind === "NOSALE" ? "" : `amount=${amount} reason=${reason}`,
@@ -251,7 +251,8 @@ export async function writeSale(
 	const at = now();
 	const id = "(SELECT id FROM sales WHERE token = ?)";
 	const a = (action: string, detail: string, approver?: string) =>
-		db.prepare(`INSERT INTO audit (at, userid, store, reg, action, subject, detail, approver) VALUES (?, ?, ?, ?, ?, CAST(${id} AS TEXT), ?, ?)`)
+		db.prepare(`INSERT INTO audit (id, at, userid, store, reg, action, subject, detail, approver)
+			VALUES (${nextId("audit")}, ?, ?, ?, ?, ?, CAST(${id} AS TEXT), ?, ?)`)
 			.bind(at, opUser(lane), lane.store, lane.reg, action, token, detail, approver ?? null);
 	// Each line's own adjustments, then those off the whole sale, added up
 	// (each line's net has its share).
@@ -259,8 +260,8 @@ export async function writeSale(
 	const approved = (x: Adj) => x.approver && (x.kind === "OVERRIDE" || x.kind === "LINEDISC" || x.kind === "SALEDISC");
 	try {
 		await db.batch([
-			db.prepare(`INSERT INTO sales (token, store, reg, drawer, emp, at, subtotal, discount, tax, total, change, status, customer)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+			db.prepare(`INSERT INTO sales (id, token, store, reg, drawer, emp, at, subtotal, discount, tax, total, change, status, customer)
+				VALUES (${nextId("sales")}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 				.bind(token, lane.store, lane.reg, lane.drawer, lane.emp, at, t.subtotal, t.discount, t.tax, t.total, change, status, customer ?? null),
 			...lines.map((l, i) => db.prepare(`INSERT INTO sale_lines (sale, line, sku, descr, dept, qty, price, amount, taxable, voided, orig_price, reason,
 					discount, net, ret_sale, ret_line, card)
@@ -312,7 +313,7 @@ function cardMoves(db: D1Database, saleId: string, token: string, lines: Line[],
 			db.prepare("INSERT INTO cards (number, kind, balance, customer, issued_at, updated_at) VALUES (?, ?, 0, ?, ?, ?) ON CONFLICT (number) DO NOTHING")
 				.bind(number, kind, customer ?? null, at, at),
 			db.prepare("UPDATE cards SET balance = balance + ?, updated_at = ? WHERE number = ?").bind(amount, at, number),
-			db.prepare(`INSERT INTO card_moves (card, at, sale, amount) VALUES (?, ?, ${saleId}, ?)`).bind(number, at, token, amount),
+			db.prepare(`INSERT INTO card_moves (id, card, at, sale, amount) VALUES (${nextId("card_moves")}, ?, ?, ${saleId}, ?)`).bind(number, at, token, amount),
 		);
 	};
 	for (const l of lines) if (l.card && !l.void) move(l.card, "GIFT", l.amount);

@@ -4,7 +4,7 @@
 // days and shifts are the store's local ones, so the screens pass the
 // terminal's offset from UTC (minutes) where it matters.
 
-import { audit, Invalid, now, unique } from "./db";
+import { audit, Invalid, nextId, now, unique } from "./db";
 
 export interface Punch {
 	id: number;
@@ -72,7 +72,7 @@ export async function punch(db: D1Database, op: { emp: number; operator: string 
 	}
 	await unique(
 		db.batch([
-			db.prepare("INSERT INTO punches (emp, store, reg, in_at) VALUES (?, ?, ?, ?)").bind(op.emp, store, reg, at),
+			db.prepare(`INSERT INTO punches (id, emp, store, reg, in_at) VALUES (${nextId("punches")}, ?, ?, ?, ?)`).bind(op.emp, store, reg, at),
 			audit(db, actor, { action: "TIME.IN", subject: String(op.emp), store, reg }, at),
 		]),
 		new Invalid("operator", "ALREADY ON THE CLOCK - TRY AGAIN"),
@@ -170,7 +170,7 @@ export async function savePunch(
 		return;
 	}
 	await unique(db.batch([
-		db.prepare("INSERT INTO punches (emp, store, in_at, out_at, edited_by, note) VALUES (?, ?, ?, ?, ?, ?)").bind(p.emp, p.store, p.inAt, p.outAt, userid, p.reason),
+		db.prepare(`INSERT INTO punches (id, emp, store, in_at, out_at, edited_by, note) VALUES (${nextId("punches")}, ?, ?, ?, ?, ?, ?)`).bind(p.emp, p.store, p.inAt, p.outAt, userid, p.reason),
 		audit(db, userid, { action: "TIME.ADD", subject: String(p.emp), store: p.store, detail: `in=${p.inAt} out=${p.outAt ?? ""} reason=${p.reason}` }, at),
 	]), open);
 }

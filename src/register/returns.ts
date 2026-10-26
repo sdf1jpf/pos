@@ -1,17 +1,23 @@
 import { clock, invalidKey, keys, label, lpad, message, msgId, pad, panel, pf, withFill } from "@greenscreen-dev/worker";
+import { SPAN } from "../data/db";
 import { findItem, getSale, lineAmount, type Line } from "../data/register";
 import type { Env } from "../env";
 import { dollars } from "../money";
 import { laneScreen, onLane, readQty, showQty } from "./common";
-import { receiptNo } from "./receipt";
+import { receiptNo, saleNo } from "./receipt";
 import type { ApproveState, ReturnState, SaleState } from "./types";
 
 // readReceipt reads a receipt number as printed (1-01-000123), its barcode
-// (*1-01-000123*) or a bare sale number, and returns the sale number.
-export function readReceipt(s: string): number | undefined {
-	const t = s.trim().replace(/^\*|\*$/g, "");
-	const m = /^(?:\d{1,3}-\d{1,2}-)?(\d{1,9})$/.exec(t);
-	return m ? Number(m[1]) : undefined;
+// (*1-01-000123*) or a bare sale number, and returns the sale number. One
+// rung on a store server (1-01-L000123) is in that store's range: store,
+// if the receipt doesn't say, is this register's.
+export function readReceipt(s: string, store?: number): number | undefined {
+	const t = s.trim().toUpperCase().replace(/^\*|\*$/g, "");
+	const m = /^(?:(\d{1,3})-\d{1,2}-)?(L?)(\d{1,9})$/.exec(t);
+	if (!m) return undefined;
+	if (!m[2]) return Number(m[3]);
+	const st = m[1] ? Number(m[1]) : store;
+	return st ? st * SPAN + Number(m[3]) : undefined;
 }
 
 // pendingBack is how much of a sold line this sale is already returning.
@@ -101,12 +107,12 @@ export const returnPanel = onLane(panel<ReturnState, Env>({
 			} satisfies ApproveState;
 		}
 		const typed = inp.fields.receipt ?? "";
-		const id = readReceipt(typed);
+		const id = readReceipt(typed, s.lane.store);
 		if (id === undefined) return fail("receipt", "2325E RECEIPT NUMBER LOOKS LIKE 1-01-000123");
 		if (id !== s.sale) {
 			const sale = await getSale(ctx.env.DB, id);
 			if (!sale) return fail("receipt", `2326E RECEIPT ${typed.trim()} NOT FOUND`);
-			if (sale.status !== "C") return fail("receipt", `2327E SALE ${id} WAS ${sale.status === "V" ? "VOIDED" : "CANCELLED"} - NOTHING TO RETURN`);
+			if (sale.status !== "C") return fail("receipt", `2327E SALE ${saleNo(id)} WAS ${sale.status === "V" ? "VOIDED" : "CANCELLED"} - NOTHING TO RETURN`);
 			s.sale = id;
 			s.msg = `${msgId(ctx, "2328I")} KEY THE QUANTITY COMING BACK BESIDE EACH LINE`;
 			return s;

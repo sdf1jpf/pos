@@ -12,6 +12,7 @@ import { cents, dollars } from "../money";
 import type { PosCtx } from "../screens/types";
 import { laneScreen, newSale, onLane, readQty, showQty, signOn } from "./common";
 import { runCard } from "../data/cardterm";
+import { saleNo } from "./receipt";
 import type { CardState, DiscountState, FunctionsState, ReceiptState, SaleState, TenderState } from "./types";
 
 const MAX_LINES = 60;
@@ -185,7 +186,7 @@ export const sale = onLane(panel<SaleState, Env>({
 				}
 				try {
 					const id = await writeSale(ctx.env.DB, s.lane, s.token, s.lines, [], await priceSale(ctx, s), "X", s.customer?.id);
-					return newSale(s.lane, `${msgId(ctx, "2217I")} SALE ${id} VOIDED`);
+					return newSale(s.lane, `${msgId(ctx, "2217I")} SALE ${saleNo(id)} VOIDED`);
 				} catch (e) {
 					return drawerGone(ctx, s, e);
 				}
@@ -436,7 +437,7 @@ async function complete(ctx: PosCtx, s: TenderState, priced: Priced, change: num
 		await queuePosting(ctx.env, id);
 		return {
 			p: "receipt", lane: sale.lane, sale: id, change, back: newSale(sale.lane),
-			msg: `${msgId(ctx, "2312I")} SALE ${id} COMPLETE${change > 0 ? ` - CHANGE DUE ${dollars(change)}` : ""}`,
+			msg: `${msgId(ctx, "2312I")} SALE ${saleNo(id)} COMPLETE${change > 0 ? ` - CHANGE DUE ${dollars(change)}` : ""}`,
 		} satisfies ReceiptState;
 	} catch (e) {
 		const x = added ? sale.tenders.pop() : undefined;

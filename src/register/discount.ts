@@ -10,7 +10,7 @@ import type { Env } from "../env";
 import { cents, dollars } from "../money";
 import type { PosCtx } from "../screens/types";
 import { laneScreen, onLane } from "./common";
-import { receiptNo } from "./receipt";
+import { receiptNo, saleNo } from "./receipt";
 import type { ApproveState, DiscountState, Pending, SaleState } from "./types";
 
 // readDiscount reads "10%" (hundredths of a percent) or "2.00" (cents).
@@ -194,7 +194,7 @@ export const approve = onLane(panel<ApproveState, Env>({
 			if (!(e instanceof Invalid)) throw e;
 			return { ...s.back, msg: `${msgId(ctx, "2906E")} ${e.message}` };
 		}
-		return { ...s.back, msg: `${msgId(ctx, "2907I")} SALE ${s.sale} VOIDED - APPROVED BY ${got.op.name}` };
+		return { ...s.back, msg: `${msgId(ctx, "2907I")} SALE ${saleNo(s.sale)} VOIDED - APPROVED BY ${got.op.name}` };
 	},
 }));
 

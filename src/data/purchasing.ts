@@ -4,7 +4,7 @@
 // unique by what made it.
 
 import { cents } from "../money";
-import { audit, changed, Conflict, diff, Invalid, now, text, unique } from "./db";
+import { audit, changed, Conflict, diff, Invalid, nextId, now, text, unique } from "./db";
 import { getItem } from "./items";
 import { readQty } from "./stock";
 
@@ -200,7 +200,7 @@ export async function newPo(
 		db.prepare("INSERT INTO purchase_orders (vendor, store, expected, created_at, created_by) VALUES (?, ?, ?, ?, ?)")
 			.bind(vendor, store, expected, at, userid),
 		...lines.map((l) => db.prepare(`INSERT INTO po_lines (po, sku, qty, cost) VALUES (${po}, ?, ?, ?)`).bind(userid, l.sku, l.qty, l.cost)),
-		db.prepare(`INSERT INTO audit (at, userid, store, action, subject, detail) VALUES (?, ?, ?, 'PO.ADD', CAST(${po} AS TEXT), ?)`)
+		db.prepare(`INSERT INTO audit (id, at, userid, store, action, subject, detail) VALUES (${nextId("audit")}, ?, ?, ?, 'PO.ADD', CAST(${po} AS TEXT), ?)`)
 			.bind(at, userid, store, userid, `vendor=${vendor} lines=${lines.length}`),
 	]);
 	return (await db.prepare(`SELECT ${po} AS id`).bind(userid).first<{ id: number }>())!.id;
@@ -386,7 +386,7 @@ export async function returnToVendor(
 					ON CONFLICT (store, sku) DO UPDATE SET on_hand = on_hand + excluded.on_hand, updated_at = excluded.updated_at`)
 					.bind(store, l.sku, -l.qty, at),
 			]),
-			db.prepare(`INSERT INTO audit (at, userid, store, action, subject, detail) VALUES (?, ?, ?, 'VENDOR.RETURN', CAST(${ret} AS TEXT), ?)`)
+			db.prepare(`INSERT INTO audit (id, at, userid, store, action, subject, detail) VALUES (${nextId("audit")}, ?, ?, ?, 'VENDOR.RETURN', CAST(${ret} AS TEXT), ?)`)
 				.bind(at, userid, store, token, `vendor=${vendor} lines=${lines.length}`),
 		]);
 	} catch (e) {

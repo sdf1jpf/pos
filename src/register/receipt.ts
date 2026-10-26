@@ -1,4 +1,5 @@
 import { clock, invalidKey, keys, lpad, message, msgId, pad, panel, pf } from "@greenscreen-dev/worker";
+import { SPAN } from "../data/db";
 import { getCard, getCustomer, type Customer } from "../data/customers";
 import { lineAdj, wholeAdj } from "../data/pricing";
 import { getSale, listSales, type Sale } from "../data/register";
@@ -15,8 +16,13 @@ const center = (s: string) => pad(" ".repeat(Math.max(Math.floor((WIDTH - s.leng
 const both = (l: string, r: string) => pad(l, WIDTH - r.length - 1) + " " + r;
 
 // receiptNo is what the receipt says and its barcode holds:
-// store-register-sale.
-export const receiptNo = (s: Pick<Sale, "store" | "reg" | "id">) => `${s.store}-${two(s.reg)}-${String(s.id).padStart(6, "0")}`;
+// store-register-sale. A sale rung on a store server (its id from the
+// store's own range) is marked L: 1-01-L000123.
+export const receiptNo = (s: Pick<Sale, "store" | "reg" | "id">) =>
+	`${s.store}-${two(s.reg)}-${s.id > SPAN ? "L" : ""}${String(s.id % SPAN).padStart(6, "0")}`;
+
+// saleNo is a sale's number in messages: L123 for one rung on a store server.
+export const saleNo = (id: number) => `${id > SPAN ? "L" : ""}${id % SPAN}`;
 
 // receipt lays out a sale as the 40-column receipt printer would.
 // cards holds the balances of the gift cards and store credit on it.
