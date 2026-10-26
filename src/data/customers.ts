@@ -1,7 +1,7 @@
 // Customers, found at the register by phone number, and the gift cards
 // and store credit they hold.
 
-import { audit, changed, Conflict, diff, Invalid, now, text, unique } from "./db";
+import { audit, changed, Conflict, diff, Invalid, nextId, now, text, unique } from "./db";
 import { checkReason } from "./reasons";
 
 export interface Customer {
@@ -49,7 +49,7 @@ export async function addCustomer(db: D1Database, userid: string, phone: string,
 	if (ex === "Y" && !exemptId) throw new Invalid("exemptId", "KEY THE TAX EXEMPT CERTIFICATE NUMBER");
 	const at = now();
 	await unique(db.batch([
-		db.prepare("INSERT INTO customers (name, phone, email, tax_exempt, exempt_id, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?)")
+		db.prepare(`INSERT INTO customers (id, name, phone, email, tax_exempt, exempt_id, updated_at, updated_by) VALUES (${nextId("customers")}, ?, ?, ?, ?, ?, ?, ?)`)
 			.bind(name, phone, email, ex === "Y" ? 1 : 0, ex === "Y" ? exemptId : "", at, userid),
 		audit(db, userid, { action: "CUST.ADD", subject: phone, detail: `${name}${ex === "Y" ? ` exempt=${exemptId}` : ""}`, store }, at),
 	]), new Invalid("phone", `PHONE ${showPhone(phone)} IS ANOTHER CUSTOMER'S`));
@@ -201,7 +201,7 @@ export async function adjustCard(db: D1Database, userid: string, number: string,
 	const at = now();
 	const [upd] = await db.batch([
 		db.prepare("UPDATE cards SET balance = balance + ?, updated_at = ? WHERE number = ? AND balance + ? >= 0").bind(amount, at, number, amount),
-		db.prepare("INSERT INTO card_moves (card, at, amount, userid, reason) SELECT ?, ?, ?, ?, ? WHERE changes() = 1").bind(number, at, amount, userid, reason),
+		db.prepare(`INSERT INTO card_moves (id, card, at, amount, userid, reason) SELECT ${nextId("card_moves")}, ?, ?, ?, ?, ? WHERE changes() = 1`).bind(number, at, amount, userid, reason),
 		audit(db, userid, { action: "CARD.ADJUST", subject: number, detail: `amount=${amount} reason=${reason} ${why}` }, at),
 	]);
 	if (changed(upd) === 0) throw new Invalid("amount", "THAT WOULD TAKE THE BALANCE BELOW 0.00");
