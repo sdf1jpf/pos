@@ -43,3 +43,6 @@ export interface VendorReturnState extends PanelState { p: "vreturn"; back: Pane
 export interface CloseState extends PanelState { p: "closeday"; back: PanelState; store?: number; closing?: string; errField?: string }
 export interface DaysState extends ListState { p: "days"; store?: number; errField?: string }
 export interface ZState extends PanelState { p: "zreport"; back: PanelState; store: number; day: string; top?: number }
+export interface TimeCardsState extends ListState { p: "timecards"; store?: number; week?: string; errField?: string }
+export interface TimeCardState extends PanelState { p: "timecard"; back: PanelState; store: number; emp: number; week: string; keys?: string[]; errField?: string; errSel?: string }
+export interface ScheduleState extends ListState { p: "schedule"; store?: number; week?: string; errField?: string }

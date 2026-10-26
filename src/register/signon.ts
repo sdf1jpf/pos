@@ -1,8 +1,9 @@
-import { invalidKey, keys, label, logoff, message, msgId, newScreen, header, panel, pf, withFill } from "@greenscreen-dev/worker";
+import { clock, invalidKey, keys, label, logoff, message, msgId, newScreen, header, panel, pf, withFill } from "@greenscreen-dev/worker";
 import { canStore, who } from "../access";
 import { checkPin } from "../data/pins";
 import { laneAudit, openDrawer, openDrawerAt, registerInfo, type Lane } from "../data/register";
 import { storeNumber } from "../data/stores";
+import { hours, punch } from "../data/timeclock";
 import type { Env } from "../env";
 import { guarded } from "../screens/common";
 import { laneScreen, newSale, onLane, signOn } from "./common";
@@ -53,7 +54,7 @@ export const laneSelect = guarded("register", panel<LaneSelectState, Env>({
 }));
 
 // POS210 REGISTER SIGN ON: operator ID and PIN. Three wrong PINs in a row
-// lock the operator out.
+// lock the operator out. PF9 with the same ID and PIN is the time clock.
 
 export const signon = onLane(panel<SignOnState, Env>({
 	async render(ctx, s) {
@@ -66,14 +67,14 @@ export const signon = onLane(panel<SignOnState, Env>({
 		label(scr, 10, 22, "PIN      ===>");
 		scr.input(10, 36, 4, "pin", "", { numeric: true, hidden: true, bright: s.errField === "pin" });
 		message(scr, s.msg ?? "");
-		keys(scr, s.via === "office" ? "PF3=BACK OFFICE  ENTER=SIGN ON" : "PF3=LOG OFF  ENTER=SIGN ON");
+		keys(scr, `${s.via === "office" ? "PF3=BACK OFFICE" : "PF3=LOG OFF"}  PF9=CLOCK IN/OUT  ENTER=SIGN ON`);
 		scr.cursorTo(s.errField ?? "operator");
 		return scr;
 	},
 	async handle(ctx, s, inp) {
 		s.msg = s.errField = undefined;
 		if (inp.aid === pf(3)) return s.via === "office" ? { p: "menu" } : logoff(ctx);
-		if (inp.aid !== "ENTER") {
+		if (inp.aid !== "ENTER" && inp.aid !== pf(9)) {
 			s.msg = invalidKey(ctx, inp.aid);
 			return s;
 		}
@@ -102,6 +103,14 @@ export const signon = onLane(panel<SignOnState, Env>({
 				default:
 					return fail("operator", "2104E OPERATOR ID OR PIN IS WRONG");
 			}
+		}
+		if (inp.aid === pf(9)) {
+			// The time clock: in or out, and back to sign-on for the next person.
+			const p = await punch(ctx.env.DB, got.op, s.store, s.reg);
+			s.msg = p.kind === "in"
+				? `${msgId(ctx, "2112I")} ${got.op.name} CLOCKED IN AT ${clock(ctx, p.at).slice(6, 11)}`
+				: `${msgId(ctx, "2113I")} ${got.op.name} CLOCKED OUT AT ${clock(ctx, p.at).slice(6, 11)} - ${hours(p.minutes)} HOURS`;
+			return s;
 		}
 		const lane: Lane = { store: s.store, reg: s.reg, emp: got.op.emp, op: got.op.operator, name: got.op.name, via: s.via };
 		await laneAudit(ctx.env.DB, lane, "REG.SIGNON", s.via === "office" ? `from back office by ${ctx.user}` : "");

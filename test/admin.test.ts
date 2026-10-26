@@ -61,7 +61,7 @@ describe("stores", () => {
 
 describe("employees", () => {
 	it("adds an employee who can then sign on with their role", async () => {
-		const { t, r } = await at("ADMIN", "4");
+		const { t, r } = await at("ADMIN", "4.1");
 		expect(map(r)).toBe("POS410");
 		expect(text(r)).toContain("PAT BUYER");
 		await t.key("PF5");
@@ -86,7 +86,7 @@ describe("employees", () => {
 		await buyer.key("START");
 		await buyer.key("ENTER", { option: "1.1" });
 
-		const { t } = await at("ADMIN", "4");
+		const { t } = await at("ADMIN", "4.1");
 		await t.key("ENTER", { "sel:1": "S" });
 		const r = await t.key("ENTER", { role: "CASHIER" });
 		expect(text(r)).toContain("EMPLOYEE 1 UPDATED");

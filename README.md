@@ -49,8 +49,12 @@ orders, reorder points and returns to vendors).
 | POS510 | 5.1 CLOSE: a store's business day; once every drawer is closed, PF10 closes it (posts its sales, makes the Z report, moves the store to the next day); PF11 reopens the last closed day (admins) | same |
 | POS520 | 5.2 DAYS: a store's closed days | same |
 | POS521 | Z report: sales, returns, tenders, paid in and out, each drawer's over/short and the deposit slip | same |
-| POS410 | 4 EMPLOYEES: people, roles, userids, operator IDs, stores | admins |
+| POSM04 | 4 EMPLOYEES | admins, managers (their stores) |
+| POS410 | 4.1 EMPLOYEES: people, roles, userids, operator IDs, stores | admins |
 | POS411 | Employee: add or update | admins |
+| POS420 | 4.2 TIME CARDS: a store's week, hours by day, worked against scheduled | managers (their stores), admins |
+| POS421 | Time card: one person's punches; change times in place, D deletes, the last line adds one, each with a reason | same |
+| POS430 | 4.3 SCHEDULE: a store's week of shifts; PF6 copies last week into the days left blank | same |
 | POSM08 | 8 ADMIN | admins |
 | POS810 | 8.1 STORES: S shows a store, R its registers | admins |
 | POS811 | Store: address, tax rate, discount limit, receipt header and footer | admins |
@@ -59,11 +63,15 @@ orders, reorder points and returns to vendors).
 
 Menu numbers follow the plan (6 REPORTS and 7 CUSTOMERS come later), so
 fast paths like `=1.3` won't move. Inventory's maps are POS31x to POS33x,
-purchasing's POS36x to POS38x and end of day's POS51x to POS52x, since the
-register has POS2xx.
+purchasing's POS36x to POS38x, time cards and the schedule POS42x to
+POS43x and end of day's POS51x to POS52x, since the register has POS2xx.
 
 Rules worth knowing:
 
+- **Time clock.** On the register's sign-on screen, PF9 with an operator
+  ID and PIN clocks that person in, or out if they are on the clock.
+  Managers fix punches on the time card; every change needs a reason and
+  is audited.
 - **Business day.** Each store has one. A drawer belongs to the day it
   opened on, and its sales with it. Closing a day runs as a Workflow
   (`greenscreen-pos-close-day`) and is refused while any drawer is open;
@@ -109,7 +117,7 @@ Durable Object).
 
 | Map | Panel |
 | --- | --- |
-| POS210 | Sign on: operator ID and 4-digit PIN. Three wrong PINs lock the operator out until an admin sets a new PIN (POS411) |
+| POS210 | Sign on: operator ID and 4-digit PIN. Three wrong PINs lock the operator out until an admin sets a new PIN (POS411). PF9 clocks the operator in or out |
 | POS211 | Open the drawer: the float, counted by denomination; PF10 opens it |
 | POS220 | Sale: scan or key a SKU or UPC, a quantity or a weight in pounds. PF2 checks a price, PF6 voids a line, PF12 (twice) voids the sale |
 | POS227 | Discount (PF9): a percent or amount off a line, a percent off the sale, or a line's price overridden with a reason |
