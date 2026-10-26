@@ -63,6 +63,12 @@ What it does and doesn't do is under "In-store mode" in the main README.
    Or open `http://<the server>:8080` in a browser on the store's network
    for the browser terminal.
 
+6. **Customer displays.** A display on the store's network opens
+   `http://<the server>:8080/display` and is paired at its register (PF4,
+   option 12). A register Mac with two monitors does this itself: make its
+   app with the server's URL (`scripts/make-mac-app.sh --register LANE1
+   http://<the server>:8080`).
+
 ## Keeping an eye on it
 
 - In the back office, the store's screen (8.1, `S`) says when its server

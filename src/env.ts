@@ -1,11 +1,13 @@
 import type { AccessEnv } from "@greenscreen-dev/worker";
 import type { Sessions } from "@greenscreen-dev/worker/sessions";
 import type { CloseParams } from "./closeday";
+import type { Display } from "./display";
 import type { Posting } from "./posting";
 
 export interface Env extends AccessEnv {
 	DB: D1Database;
 	SESSIONS?: DurableObjectNamespace<Sessions<Env>>; // signed-on sessions and record locks
+	DISPLAYS?: DurableObjectNamespace<Display>; // each register's customer display
 	POSTING?: Queue<Posting>; // sales to post to the stock ledger
 	CLOSE_DAY?: Workflow<CloseParams>; // end-of-day close
 	STATE_KEY?: string; // signs the commarea

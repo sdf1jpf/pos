@@ -35,9 +35,9 @@ export async function priceSale(ctx: PosCtx, s: SaleState): Promise<Priced> {
 }
 
 // One row of the sale as shown: a line as rung, or something taken off.
-interface Row { n?: number; sku?: string; desc: string; qty?: string; price?: string; amount: string; t?: boolean; void?: boolean; off?: boolean }
+export interface Row { n?: number; sku?: string; desc: string; qty?: string; price?: string; amount: string; t?: boolean; void?: boolean; off?: boolean }
 
-function rows(s: SaleState, p: Priced): Row[] {
+export function rows(s: SaleState, p: Priced): Row[] {
 	const out: Row[] = [];
 	s.lines.forEach((l, i) => {
 		out.push({
@@ -261,7 +261,7 @@ const KINDS: Record<string, TenderKind> = {
 	C: "CASH", CASH: "CASH", D: "CARD", CARD: "CARD", K: "CHECK", CHECK: "CHECK", G: "GIFT", GIFT: "GIFT", S: "CREDIT", CREDIT: "CREDIT",
 };
 
-const tenderText = (x: Tender) =>
+export const tenderText = (x: Tender) =>
 	x.kind === "CARD" ? `CARD ****${x.ref}` : x.kind === "CHECK" ? `CHECK #${x.ref}` : x.kind === "GIFT" ? `GIFT CARD *${x.ref?.slice(-4)}`
 		: x.kind === "CREDIT" ? `STORE CREDIT ${x.ref}` : "CASH";
 

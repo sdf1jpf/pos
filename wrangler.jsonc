@@ -17,9 +17,10 @@
 		}
 	],
 	// Sessions and record locks (one terminal at a time runs a register), in
-	// greenscreen's Sessions Durable Object.
-	"durable_objects": { "bindings": [{ "name": "SESSIONS", "class_name": "Sessions" }] },
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sessions"] }],
+	// greenscreen's Sessions Durable Object; each register's customer display
+	// in a Display (src/display.ts).
+	"durable_objects": { "bindings": [{ "name": "SESSIONS", "class_name": "Sessions" }, { "name": "DISPLAYS", "class_name": "Display" }] },
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sessions"] }, { "tag": "v2", "new_sqlite_classes": ["Display"] }],
 	// Paid sales are posted to the stock ledger through a queue, and a sweep
 	// every five minutes posts any the queue missed. The deploy creates the
 	// queue if it isn't there.

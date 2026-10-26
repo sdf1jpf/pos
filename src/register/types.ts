@@ -44,6 +44,8 @@ export interface DiscountState extends PanelState { p: "discount"; lane: Lane; b
 export interface ReturnState extends PanelState { p: "return"; lane: Lane; back: SaleState; sale?: number; noReceipt?: boolean; errField?: string; errSel?: string }
 export interface CustomerState extends PanelState { p: "customer"; lane: Lane; back: SaleState; phone?: string; adding?: boolean; errField?: string }
 export interface GiftState extends PanelState { p: "gift"; lane: Lane; back: SaleState; errField?: string }
+// Pairing a customer display to the register.
+export interface DisplayState extends PanelState { p: "display"; lane: Lane; back: SaleState; errField?: string }
 export interface ResumeState extends PanelState { p: "resume"; lane: Lane; back: SaleState; keys?: string[]; errSel?: string }
 
 // A discount or override waiting for approval. line is 1-based; none is

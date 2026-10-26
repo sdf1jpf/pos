@@ -12,6 +12,6 @@
 	"d1_databases": [
 		{ "binding": "DB", "database_name": "greenscreen-pos-store", "database_id": "local", "migrations_dir": "../migrations" }
 	],
-	"durable_objects": { "bindings": [{ "name": "SESSIONS", "class_name": "Sessions" }] },
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sessions"] }]
+	"durable_objects": { "bindings": [{ "name": "SESSIONS", "class_name": "Sessions" }, { "name": "DISPLAYS", "class_name": "Display" }] },
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sessions"] }, { "tag": "v2", "new_sqlite_classes": ["Display"] }]
 }

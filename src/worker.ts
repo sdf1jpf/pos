@@ -1,7 +1,7 @@
 // The Worker's entry: the app, the queue consumer and cron sweep that post
 // sales to the stock ledger, the end-of-day Workflow, and the Durable
-// Object that keeps sessions and record locks. On a store server the cron
-// syncs with the cloud.
+// Objects that keep sessions and record locks and push the customer
+// displays. On a store server the cron syncs with the cloud.
 import app from "./index";
 import type { Env } from "./env";
 import { consume, sweep, type Posting } from "./posting";
@@ -9,6 +9,7 @@ import { syncStore } from "./sync";
 
 export { Sessions } from "@greenscreen-dev/worker/sessions";
 export { CloseDay } from "./closeday";
+export { Display } from "./display";
 
 export default {
 	fetch: app.fetch,
