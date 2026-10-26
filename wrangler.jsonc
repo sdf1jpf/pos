@@ -17,14 +17,14 @@
 		}
 	],
 	// Cloudflare Access guards the back office; the Worker verifies its JWT.
-	// ACCESS_AUD is the audience tag of the Access application for this
-	// Worker (see README). Until it is set, every request is refused.
+	// ACCESS_AUD is the audience tag of the Access application for
+	// greenscreen-pos.justin-frank.workers.dev (see README).
 	// ADMIN_USERS are administrators whether or not they are on the
 	// employee file, so the first person can sign on and add the rest.
 	// STATE_KEY is a secret: wrangler secret put STATE_KEY.
 	"vars": {
 		"ACCESS_TEAM_DOMAIN": "parkerfrank.cloudflareaccess.com",
-		"ACCESS_AUD": "",
+		"ACCESS_AUD": "f47d41426296830268990eeca7be313845262464835ea14ad44d8d815f072b8e",
 		"ADMIN_USERS": "JUSTINFR,SDF1JPF"
 	}
 }

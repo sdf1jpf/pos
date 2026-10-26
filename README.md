@@ -93,12 +93,12 @@ the Worker and smoke-tests it. One-time setup:
 2. **Secrets for the Worker:** `npx wrangler secret put STATE_KEY` (any long
    random string; it signs the commarea).
 3. **Cloudflare Access.** Create a self-hosted Access application for the
-   Worker's hostname, with an Allow policy for the people who use the back
+   Worker's hostname (`greenscreen-pos.justin-frank.workers.dev`), with an Allow policy for the people who use the back
    office and a Service Auth policy for a service token (for the smoke
    test). Add a Bypass policy on `/v1/health` and `/v1/screen/info`, so
-   the terminals can title their logon screen. Put the application's
-   audience tag in `ACCESS_AUD` in `wrangler.jsonc`. Until it is set, the
-   Worker refuses every request.
+   the terminals can title their logon screen. Its audience tag is
+   `ACCESS_AUD` in `wrangler.jsonc`; without one, the Worker refuses every
+   request.
 4. **GitHub secrets** (in the `production` environment):
    `CLOUDFLARE_API_TOKEN` (Workers Scripts edit, D1 edit),
    `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` (the service token).
