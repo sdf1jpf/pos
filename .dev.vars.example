@@ -1,0 +1,6 @@
+# Copy to .dev.vars for `npm run dev`. Without Cloudflare Access locally,
+# every request is signed on as DEV_USER, who is an administrator because
+# they are in ADMIN_USERS.
+DEV_USER=ADMIN
+ADMIN_USERS=ADMIN
+STATE_KEY=dev-only
