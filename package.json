@@ -19,8 +19,8 @@
     "db:demo:remote": "mkdir -p .wrangler && node seed/demo.mjs > .wrangler/demo.sql && wrangler d1 execute greenscreen-pos --remote --file=.wrangler/demo.sql"
   },
   "dependencies": {
-    "@greenscreen-dev/web": "^0.2.2",
-    "@greenscreen-dev/worker": "^0.2.3",
+    "@greenscreen-dev/web": "^0.2.4",
+    "@greenscreen-dev/worker": "^0.2.4",
     "hono": "^4.13.14"
   },
   "devDependencies": {
