@@ -9,7 +9,9 @@
     "test": "vitest run",
     "db:migrate:local": "wrangler d1 migrations apply greenscreen-pos --local",
     "db:migrate:remote": "wrangler d1 migrations apply greenscreen-pos --remote",
-    "db:seed:local": "wrangler d1 execute greenscreen-pos --local --file=seed.sql"
+    "db:seed:local": "wrangler d1 execute greenscreen-pos --local --file=seed.sql",
+    "db:sample:local": "wrangler d1 execute greenscreen-pos --local --file=seed/sample.sql",
+    "db:sample:remote": "wrangler d1 execute greenscreen-pos --remote --file=seed/sample.sql"
   },
   "dependencies": {
     "@greenscreen-dev/web": "^0.1.1",

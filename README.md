@@ -57,7 +57,8 @@ src/access.ts        who is signed on, their role and stores
 src/data/*.ts        stores, items, employees: SQL, validation, audit
 src/screens/*.ts     one module per panel group
 migrations/          the D1 schema
-seed.sql             sample data for local runs and the tests
+seed.sql             the small fixture the tests use
+seed/sample.sql      fuller sample data: 3 stores, ~50 items, every role
 test/                tests against a real (local) D1, through POST /v1/screen
 ```
 
@@ -74,6 +75,20 @@ Open http://localhost:8787 for the browser terminal, or run the Go terminal:
 `go run github.com/sdf1jpf/greenscreen/cmd/greenscreen@latest -api http://localhost:8787`.
 The seed has users `BUYER`, `MANAGER` (store 2 only) and `CASHIER`; set
 `DEV_USER` in `.dev.vars` to try each role.
+
+For something closer to a real chain, load `seed/sample.sql` into an empty
+database instead of `seed.sql`: three stores with ten registers, nine
+departments, 48 items (some weighed, one discontinued) with price books for
+stores 2 and 3, and fourteen people in every role. Its back-office userids
+are `AADMIN`, `PORTIZ` and `DLEE` (buyers), `MPATEL`, `RCOLE`, `GWARD`
+(managers of stores 1, 2, 3), `SNGUYEN` and `TKIM` (supervisors); cashiers
+have operator IDs 3001 to 3006. It's safe to run again, and never changes
+a row that already exists.
+
+```sh
+npm run db:migrate:local && npm run db:sample:local
+npm run db:sample:remote                # the deployed database
+```
 
 ```sh
 npm test            # vitest in workerd, with migrations and seed applied
