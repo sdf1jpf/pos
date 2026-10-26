@@ -1,11 +1,12 @@
 import { invalidKey, keys, label, lpad, message, msgId, panel, pf, withFill, type Input, type Screen } from "@greenscreen-dev/worker";
 import { Invalid } from "../data/db";
-import { closeDrawer, countTotal, DENOMS, drawerMove, drawerTotals, laneAudit, readCounts, type Counts } from "../data/register";
+import { closeDrawer, countTotal, DENOMS, drawerMove, drawerTotals, laneAudit, readCounts, suspend, type Counts } from "../data/register";
 import type { Env } from "../env";
 import { cents, dollars } from "../money";
 import type { PosCtx } from "../screens/types";
-import { laneScreen, onLane, signOn } from "./common";
-import type { CloseDrawerState, FunctionsState, PaidState, ReceiptsState } from "./types";
+import { laneScreen, newSale, onLane, signOn } from "./common";
+import { priceSale, localNow } from "./sale";
+import type { CloseDrawerState, CustomerState, FunctionsState, GiftState, PaidState, ReceiptsState, ResumeState, ReturnState, SaleState } from "./types";
 
 // countForm draws a denomination count: bills on the left, coins on the
 // right, each with what it comes to, and the total.
@@ -39,6 +40,7 @@ export function readCountsInto(ctx: PosCtx, s: { counts: Counts; msg?: string; e
 
 // POS225 REGISTER FUNCTIONS, between sales.
 
+// The first six are for between sales; the rest work during one too.
 const OPTIONS = [
 	["1", "RECEIPTS", "Reprint a receipt, or void a sale (with a manager)"],
 	["2", "PAID IN", "Cash put in the drawer, with a reason"],
@@ -46,6 +48,11 @@ const OPTIONS = [
 	["4", "NO SALE", "Open the drawer"],
 	["5", "CLOSE DRAWER", "Count the drawer out and sign off"],
 	["6", "SIGN OFF", "Leave the drawer open for the next operator"],
+	["7", "CUSTOMER", "Put a customer on the sale, by phone"],
+	["8", "RETURN", "Take items back, from a receipt or without one"],
+	["9", "GIFT CARD", "Sell or load a gift card; PF2 there for a balance"],
+	["10", "SUSPEND", "Put this sale aside to finish later today"],
+	["11", "RESUME", "Finish a sale suspended at this store today"],
 ] as const;
 
 export const functions = onLane(panel<FunctionsState, Env>({
@@ -54,7 +61,7 @@ export const functions = onLane(panel<FunctionsState, Env>({
 		label(scr, 5, 2, "OPTION ===>");
 		scr.input(5, 14, 2, "option", "", { bright: s.errField === "option" });
 		OPTIONS.forEach(([k, name, desc], i) => {
-			scr.text(7 + i, 4, k, { color: "white", bright: true });
+			scr.text(7 + i, 3, lpad(k, 2), { color: "white", bright: true });
 			scr.text(7 + i, 7, name, { color: "turquoise" });
 			scr.text(7 + i, 21, desc, { color: "green" });
 		});
@@ -73,6 +80,13 @@ export const functions = onLane(panel<FunctionsState, Env>({
 		const opt = (inp.fields.option ?? "").trim().toUpperCase();
 		const pick = OPTIONS.find(([k, name]) => opt === k || (opt.length > 1 && name.startsWith(opt)));
 		const lane = s.lane;
+		const busy = s.back.lines.length > 0;
+		const between = ["1", "2", "3", "4", "5", "6", "11"];
+		if (pick && busy && between.includes(pick[0])) {
+			s.msg = `${msgId(ctx, "2253E")} ${pick[1]} IS FOR BETWEEN SALES - FINISH, SUSPEND OR VOID THIS ONE FIRST`;
+			s.errField = "option";
+			return s;
+		}
 		switch (pick?.[0]) {
 			case "1":
 				return { p: "receipts", lane, back: s.back } satisfies ReceiptsState;
@@ -87,12 +101,33 @@ export const functions = onLane(panel<FunctionsState, Env>({
 			case "6":
 				await laneAudit(ctx.env.DB, lane, "REG.SIGNOFF");
 				return signOn(lane.store, lane.reg, lane.via, `${msgId(ctx, "2110I")} ${lane.name} SIGNED OFF`);
+			case "7":
+				return { p: "customer", lane, back: s.back } satisfies CustomerState;
+			case "8":
+				return { p: "return", lane, back: s.back } satisfies ReturnState;
+			case "9":
+				return { p: "gift", lane, back: s.back } satisfies GiftState;
+			case "10":
+				return suspendSale(ctx, s.back);
+			case "11":
+				return { p: "resume", lane, back: s.back } satisfies ResumeState;
 		}
 		s.msg = `${msgId(ctx, "2252E")} ${opt ? `INVALID OPTION ${opt}` : "KEY AN OPTION"}`;
 		s.errField = "option";
 		return s;
 	},
 }));
+
+// suspendSale puts the sale aside, as rung, for any register in the store
+// to resume today.
+async function suspendSale(ctx: PosCtx, sale: SaleState) {
+	if (!sale.lines.some((l) => !l.void)) return { ...sale, msg: `${msgId(ctx, "2254E")} NOTHING TO SUSPEND` };
+	if (sale.tenders.length > 0) return { ...sale, msg: `${msgId(ctx, "2211E")} PAYMENT HAS STARTED - REMOVE IT FIRST (PF5, THEN PF6)` };
+	const t = await priceSale(ctx, sale);
+	const { token, lines, coupons, saleDisc, customer } = sale;
+	const id = await suspend(ctx.env.DB, sale.lane, localNow(ctx).slice(0, 10), t.items, t.total, { token, lines, coupons, saleDisc, customer });
+	return newSale(sale.lane, `${msgId(ctx, "2255I")} SALE SUSPENDED AS NO. ${id} - RESUME IT TODAY AT ANY REGISTER (PF4, 11)`);
+}
 
 // POS260 PAID IN / PAID OUT: cash in or out of the drawer that isn't a sale.
 

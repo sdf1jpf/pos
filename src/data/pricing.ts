@@ -88,6 +88,10 @@ export function allocate(total: number, weights: number[]): number[] {
 
 export function price(lines: Line[], promos: Promo[], coupons: Coupon[], sale: SaleDisc | undefined, taxRate: number): Priced {
 	const live = lines.map((l) => !l.void);
+	// Returns (refunded at what was paid) and gift cards (sold at face)
+	// take no promotion, discount or coupon.
+	const fixed = lines.map((l) => !!(l.ret || l.card));
+	const open = (i: number) => live[i] && !fixed[i];
 	const left = lines.map((l, i) => (live[i] ? l.amount : 0));
 	const adjustments: Adj[] = [];
 	const take = (i: number, amount: number, a: Omit<Adj, "amount" | "line">) => {
@@ -111,7 +115,7 @@ export function price(lines: Line[], promos: Promo[], coupons: Coupon[], sale: S
 	for (const p of promos) {
 		const eligible = lines
 			.map((l, i) => i)
-			.filter((i) => live[i] && !used.has(i) && !lines[i].override && !lines[i].disc && p.skus.includes(lines[i].sku));
+			.filter((i) => open(i) && !used.has(i) && !lines[i].override && !lines[i].disc && p.skus.includes(lines[i].sku));
 		if (eligible.length === 0) continue;
 		const off = new Map<number, number>();
 		const add = (i: number, n: number) => off.set(i, (off.get(i) ?? 0) + n);
@@ -143,16 +147,16 @@ export function price(lines: Line[], promos: Promo[], coupons: Coupon[], sale: S
 
 	// 3. Line discounts.
 	lines.forEach((l, i) => {
-		if (!live[i] || !l.disc) return;
+		if (!open(i) || !l.disc) return;
 		const n = l.disc.pct !== undefined ? Math.round((left[i] * l.disc.pct) / 10000) : (l.disc.amount ?? 0);
 		take(i, n, { kind: "LINEDISC", code: l.disc.pct !== undefined ? pctText(l.disc.pct) : "", desc: "DISCOUNT", approver: l.disc.approver });
 	});
 
 	// 4. Item and department coupons.
-	const before = left.reduce((a, b) => a + b, 0);
+	const before = left.reduce((a, b, i) => a + (open(i) ? b : 0), 0);
 	const fits = (c: Coupon) => before >= c.minTotal;
 	for (const c of coupons.filter((c) => (c.sku || c.dept !== null) && fits(c))) {
-		const on = lines.map((_, i) => i).filter((i) => live[i] && left[i] > 0 && (c.sku ? lines[i].sku === c.sku : lines[i].dept === c.dept));
+		const on = lines.map((_, i) => i).filter((i) => open(i) && left[i] > 0 && (c.sku ? lines[i].sku === c.sku : lines[i].dept === c.dept));
 		const base = on.map((i) => left[i]);
 		const total = c.kind === "PERCENT" ? Math.round((base.reduce((a, b) => a + b, 0) * c.value) / 10000) : c.value;
 		allocate(Math.min(total, base.reduce((a, b) => a + b, 0)), base).forEach((n, k) => take(on[k], n, { kind: "COUPON", code: c.code, desc: c.desc }));
@@ -161,13 +165,13 @@ export function price(lines: Line[], promos: Promo[], coupons: Coupon[], sale: S
 	// 5. The sale discount.
 	if (sale && sale.pct > 0) {
 		lines.forEach((_, i) => {
-			if (live[i]) take(i, Math.round((left[i] * sale.pct) / 10000), { kind: "SALEDISC", code: pctText(sale.pct), desc: "SALE DISCOUNT", approver: sale.approver, whole: true });
+			if (open(i)) take(i, Math.round((left[i] * sale.pct) / 10000), { kind: "SALEDISC", code: pctText(sale.pct), desc: "SALE DISCOUNT", approver: sale.approver, whole: true });
 		});
 	}
 
 	// 6. Sale coupons.
 	for (const c of coupons.filter((c) => !c.sku && c.dept === null && fits(c))) {
-		const base = left.slice();
+		const base = left.map((n, i) => (open(i) ? Math.max(n, 0) : 0));
 		const sum = base.reduce((a, b) => a + b, 0);
 		const total = Math.min(c.kind === "PERCENT" ? Math.round((sum * c.value) / 10000) : c.value, sum);
 		allocate(total, base).forEach((n, i) => take(i, n, { kind: "COUPON", code: c.code, desc: c.desc, whole: true }));

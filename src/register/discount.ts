@@ -34,6 +34,10 @@ function readDiscount(s: string): { pct?: number; amount?: number } | undefined 
 
 // apply makes an approved (or allowed) change to the sale being rung.
 function apply(sale: SaleState, p: Pending, approver?: string): void {
+	if (p.add) {
+		sale.lines.push({ ...p.add, ret: { noReceipt: true, approver: approver ?? "" } });
+		return;
+	}
 	if (p.line === undefined) {
 		sale.saleDisc = p.pct ? { pct: p.pct, ...(approver ? { approver } : {}) } : undefined;
 		return;
@@ -122,6 +126,7 @@ export const discount = onLane(panel<DiscountState, Env>({
 			const l = sale.lines[n - 1];
 			if (!l) return fail("line", `2275E THERE IS NO LINE ${lineTyped}`);
 			if (l.void) return fail("line", `2276E LINE ${n} IS VOID`);
+			if (l.ret || l.card) return fail("line", `2282E LINE ${n} IS ${l.card ? "A GIFT CARD" : "A RETURN"} - IT TAKES NO DISCOUNT`);
 			if (priceTyped) {
 				const price = cents(priceTyped);
 				if (!price) return fail("price", "2277E KEY THE NEW PRICE, E.G. 4.99");

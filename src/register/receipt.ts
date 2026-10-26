@@ -1,4 +1,5 @@
 import { clock, invalidKey, keys, lpad, message, msgId, pad, panel, pf } from "@greenscreen-dev/worker";
+import { getCard, getCustomer, type Customer } from "../data/customers";
 import { lineAdj, wholeAdj } from "../data/pricing";
 import { getSale, listSales, type Sale } from "../data/register";
 import { getStore, type Store } from "../data/stores";
@@ -18,14 +19,18 @@ const both = (l: string, r: string) => pad(l, WIDTH - r.length - 1) + " " + r;
 export const receiptNo = (s: Pick<Sale, "store" | "reg" | "id">) => `${s.store}-${two(s.reg)}-${String(s.id).padStart(6, "0")}`;
 
 // receipt lays out a sale as the 40-column receipt printer would.
-export function receipt(ctx: PosCtx, st: Store, s: Sale, taxRate: number): string[] {
+// cards holds the balances of the gift cards and store credit on it.
+export function receipt(ctx: PosCtx, st: Store, s: Sale, taxRate: number, cards?: Map<string, number>, customer?: Customer): string[] {
 	const out: string[] = [];
 	for (const h of [st.header1, st.header2]) if (h) out.push(center(h));
 	out.push(center(st.addr1), center([st.city, st.state, st.zip].filter(Boolean).join(" ")));
 	if (st.phone) out.push(center(st.phone));
-	out.push("", both(`STORE ${s.store} REG ${two(s.reg)} OPER ${s.operator}`, clock(ctx, s.at)), both("RECEIPT", receiptNo(s)), "-".repeat(WIDTH));
+	out.push("", both(`STORE ${s.store} REG ${two(s.reg)} OPER ${s.operator}`, clock(ctx, s.at)), both("RECEIPT", receiptNo(s)));
+	if (customer) out.push(pad(`CUSTOMER ${customer.name}`, WIDTH), ...(customer.exempt ? [pad(`TAX EXEMPT ${customer.exemptId}`, WIDTH)] : []));
+	out.push("-".repeat(WIDTH));
 	s.lines.forEach((l, i) => {
 		out.push(both(pad(l.desc, 30), `${dollars(l.amount)}${l.taxable ? "T" : " "}`));
+		if (l.ret) out.push(pad(`  RETURN${"sale" in l.ret ? ` FROM ${l.ret.sale} LINE ${l.ret.line}` : ", NO RECEIPT"}`, WIDTH));
 		if (l.qty !== 1000 || l.weighed) out.push(`  ${showQty(l.qty, l.weighed)} @ ${dollars(l.price)}${l.weighed ? "/LB" : ""}`);
 		if (l.override) out.push(pad(`  PRICE OVERRIDE, WAS ${dollars(l.override.from)} ${l.override.reason}`, WIDTH));
 		if (l.void) out.push(both("  LINE VOIDED", `${dollars(-l.amount)} `));
@@ -37,8 +42,15 @@ export function receipt(ctx: PosCtx, st: Store, s: Sale, taxRate: number): strin
 	if (s.discount > 0) out.push(center(`YOU SAVED ${dollars(s.discount)}`));
 	out.push("");
 	for (const t of s.tenders) {
-		const what = t.kind === "CARD" ? `CARD ****${t.ref} AUTH ${t.auth}` : t.kind === "CHECK" ? `CHECK #${t.ref}` : "CASH";
-		out.push(both(what, `${dollars(t.tendered)} `));
+		const what = t.kind === "CARD" ? `CARD ****${t.ref} AUTH ${t.auth}` : t.kind === "CHECK" ? `CHECK #${t.ref}`
+			: t.kind === "GIFT" ? `GIFT CARD *${t.ref?.slice(-4)}` : t.kind === "CREDIT" ? `STORE CREDIT ${t.ref}` : "CASH";
+		out.push(both(`${t.amount < 0 ? "REFUND " : ""}${what}`, `${dollars(Math.abs(t.tendered))} `));
+		const left = cards?.get(t.ref ?? "");
+		if (left !== undefined && (t.kind === "GIFT" || t.kind === "CREDIT")) out.push(both("  BALANCE NOW", `${dollars(left)} `));
+	}
+	for (const l of s.lines) {
+		const left = l.card && !l.void ? cards?.get(l.card) : undefined;
+		if (left !== undefined) out.push(both(`GIFT CARD *${l.card!.slice(-4)} BALANCE`, `${dollars(left)} `));
 	}
 	if (s.change > 0) out.push(both("CHANGE", `${dollars(s.change)} `));
 	out.push("");
@@ -61,7 +73,14 @@ export const receiptPanel = onLane(panel<ReceiptState, Env>({
 			keys(scr, "ENTER=RETURN");
 			return scr;
 		}
-		const lines = receipt(ctx, st, sale, st.taxRate);
+		const numbers = [...sale.tenders.map((t) => t.ref ?? ""), ...sale.lines.map((l) => l.card ?? "")].filter((n) => /^(SC)?\d{8,19}$/.test(n));
+		const cards = new Map<string, number>();
+		for (const n of new Set(numbers)) {
+			const c = await getCard(ctx.env.DB, n);
+			if (c) cards.set(n, c.balance);
+		}
+		const cust = sale.customer ? await getCustomer(ctx.env.DB, sale.customer) : undefined;
+		const lines = receipt(ctx, st, sale, st.taxRate, cards, cust);
 		const room = scr.rows - 7;
 		const top = Math.min(s.top ?? 0, Math.max(lines.length - room, 0));
 		s.top = top;
