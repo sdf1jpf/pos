@@ -25,7 +25,7 @@ interface Spec {
 	ranged?: string; // up: the column that must hold an id from the store's range
 }
 
-// The cloud's master data, in the order a new store is sent it.
+// The cloud's master data (and on hand), in the order a new store is sent it.
 export const DOWN: Record<string, Spec> = {
 	stores: { pk: ["store"] },
 	registers: { pk: ["store", "reg"], store: true },
@@ -43,6 +43,8 @@ export const DOWN: Record<string, Spec> = {
 	// A card's balance is the cloud's, less what was spent here and not yet
 	// sent up: see applyDown.
 	cards: { pk: ["number"] },
+	// On hand, for the item lookup: the cloud's, as of its last posting.
+	stock: { pk: ["store", "sku"], store: true },
 };
 
 // What a store's registers write. A sale's posting and its lines' cost

@@ -194,10 +194,11 @@ up is in [store/README.md](store/README.md).
 - **What goes where.** The cloud sends down the master data the registers
   need: stores, the store's own registers and prices, departments, items,
   promotions, coupons, employees, reason codes, customers and gift card
-  balances. The store sends up what its registers write: drawers, sales
-  with their lines, tenders and adjustments, paid in and out, punches,
-  customers added at the register, gift card moves and the audit log. The
-  back office, posting to the stock ledger and end of day stay in the cloud.
+  balances, and on hand for the item lookup. The store sends up what its
+  registers write: drawers, sales with their lines, tenders and
+  adjustments, paid in and out, punches, customers added at the register,
+  gift card moves and the audit log. The back office, posting to the stock
+  ledger and end of day stay in the cloud.
 - **How.** Triggers log each change (`changes`, migration 0011). Every few
   seconds the store server sends its changes up (`POST /v1/sync`) and asks
   for the cloud's since the last it had (`GET /v1/sync?since=`), signed on

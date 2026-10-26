@@ -57,6 +57,7 @@ describe("a store server", () => {
 		}
 		expect(await count(env.STORE_DB, "registers")).toBe(await count(env.DB, "registers", "store = 1"));
 		expect(await count(env.STORE_DB, "prices", "store <> 1")).toBe(0);
+		expect(await count(env.STORE_DB, "stock")).toBe(await count(env.DB, "stock", "store = 1"));
 		expect(await count(env.STORE_DB, "changes")).toBe(0); // nothing it was sent goes back
 		expect((await one<{ balance: number }>(env.STORE_DB, "SELECT balance FROM cards WHERE number = ?", CARD)).balance).toBe(5000);
 	});

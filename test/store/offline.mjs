@@ -122,7 +122,7 @@ try {
 	step("a sale is rung with the cloud gone");
 	let r = await key("ENTER", { operator: "3001", pin: "1234" });
 	if (r.map === "POS211") r = await key("PF10", { "n:20": "5" });
-	expect(r.map === "POS220", `the drawer opens (${r.map} ${r.text.slice(-200)})`);
+	expect(r.map === "POS220", "the drawer opens");
 	await key("ENTER", { item: "300100" });
 	await key("PF5");
 	r = await key("ENTER", { method: "C", amount: "20" });
