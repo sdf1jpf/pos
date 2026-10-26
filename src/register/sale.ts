@@ -7,6 +7,7 @@ import {
 	type Line, type Tender, type TenderKind,
 } from "../data/register";
 import type { Env } from "../env";
+import { queuePosting } from "../posting";
 import { cents, dollars } from "../money";
 import type { PosCtx } from "../screens/types";
 import { laneScreen, newSale, onLane, readQty, showQty, signOn } from "./common";
@@ -348,6 +349,7 @@ async function complete(ctx: PosCtx, s: TenderState, priced: Priced, change: num
 	const sale = s.back;
 	try {
 		const id = await writeSale(ctx.env.DB, sale.lane, sale.token, sale.lines, sale.tenders, priced, "C", sale.customer?.id);
+		await queuePosting(ctx.env, id);
 		return {
 			p: "receipt", lane: sale.lane, sale: id, change, back: newSale(sale.lane),
 			msg: `${msgId(ctx, "2312I")} SALE ${id} COMPLETE${change > 0 ? ` - CHANGE DUE ${dollars(change)}` : ""}`,

@@ -12,7 +12,9 @@ Cloudflare Access with roles, and the back-office panels for stores,
 registers, items, departments, price books and employees. Phase 2 is the
 register: sign-on, drawers, sales, tenders, receipts and post-voids;
 discounts, price overrides, coupons and promotions; returns, customers,
-suspended sales, gift cards and store credit.
+suspended sales, gift cards and store credit. Phase 3 is the back office,
+starting with inventory: the stock ledger, adjustments, counts and
+transfers.
 
 ## The back office
 
@@ -26,6 +28,14 @@ suspended sales, gift cards and store credit.
 | POS130 | 1.3 PRICES: a store's price book; a store's own price overrides the base price | buyers, admins, managers (their stores) |
 | POS140 | 1.4 PROMOTIONS: sale prices, buy-X-get-Y and mix and match, by store and time, applied by the registers themselves | buyers, admins |
 | POS150 | 1.5 COUPONS: codes the registers take, off an item, a department or the sale | buyers, admins |
+| POSM02 | 2 INVENTORY | buyers, admins, managers (their stores) |
+| POS310 | 2.1 ON HAND: a store's stock by item; L shows an item's ledger, A adjusts it | same |
+| POS311 | Ledger: every move of an item at a store, newest first | same |
+| POS312 | 2.2 ADJUST: on hand changed with a reason (damaged, shrink, found, store use, other) | same |
+| POS320 | 2.3 COUNTS: PF5 starts a cycle count of a department, or a full count | same |
+| POS321 | Count: key what is on the shelf; PF10 posts it, setting on hand to what was counted | same |
+| POS330 | 2.4 TRANSFERS: stock sent between stores | same |
+| POS331 | Transfer: start one (up to ten items); PF10 sends it, then PF10 at the other store receives it | same |
 | POS410 | 4 EMPLOYEES: people, roles, userids, operator IDs, stores | admins |
 | POS411 | Employee: add or update | admins |
 | POSM08 | 8 ADMIN | admins |
@@ -34,9 +44,9 @@ suspended sales, gift cards and store credit.
 | POS820 | 8.2 REGISTERS: a store's registers, changed in place, and the service token each enrolled register signs on with | admins |
 | POS200 | R REGISTER: run a register on this terminal | supervisors, managers, admins |
 
-Menu numbers follow the plan (2 INVENTORY, 3 PURCHASING, 5 END OF DAY,
-6 REPORTS and 7 CUSTOMERS come later), so fast paths like `=1.3` won't
-move.
+Menu numbers follow the plan (3 PURCHASING, 5 END OF DAY, 6 REPORTS and
+7 CUSTOMERS come later), so fast paths like `=1.3` won't move. Inventory's
+maps are POS31x to POS33x, since the register has POS2xx.
 
 Rules worth knowing:
 
@@ -51,6 +61,13 @@ Rules worth knowing:
   message and the record is shown as it is now.
 - **Audit.** Every change writes an `audit` row (who, when, what, store) in
   the same transaction as the change.
+- **Stock** is kept per store and item in thousandths, like sale lines.
+  Every change writes a `stock_moves` row in the same transaction, unique
+  by what made it, so nothing is counted twice. Paid sales reach the
+  ledger through the `greenscreen-pos-posting` queue, and a cron sweep
+  every five minutes posts any the queue missed; a post-voided sale is
+  put back. On hand can go below zero: the register never refuses a sale
+  for stock.
 - **Money** is in cents; tax rates are in thousandths of a percent (8.25% is
   8250).
 
@@ -114,7 +131,8 @@ Rules worth knowing:
 ```
 src/index.ts         the app: panels, logon check, field help
 src/access.ts        who is signed on, their role and stores
-src/worker.ts        the Worker's entry: the app and the Sessions Durable Object
+src/worker.ts        the Worker's entry: the app, the posting queue and cron, the Sessions Durable Object
+src/posting.ts       posting paid sales to the stock ledger
 src/data/*.ts        stores, items, employees, PINs, the register: SQL, validation, audit
 src/screens/*.ts     the back-office panels, one module per group
 src/register/*.ts    the register panels
@@ -179,7 +197,7 @@ the Worker and smoke-tests it. One-time setup:
    `ACCESS_AUD` in `wrangler.jsonc`; without one, the Worker refuses every
    request.
 4. **GitHub secrets** (in the `production` environment):
-   `CLOUDFLARE_API_TOKEN` (Workers Scripts edit, D1 edit),
+   `CLOUDFLARE_API_TOKEN` (Workers Scripts edit, D1 edit, Queues edit),
    `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` (the service token).
 5. Set `ADMIN_USERS` in `wrangler.jsonc` to your userid (the part of your
    Access email before the @, letters and digits, at most 8 characters).

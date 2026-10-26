@@ -18,6 +18,7 @@ import { sale, tender } from "./register/sale";
 import { laneSelect, opendrawer, signon } from "./register/signon";
 import { depts } from "./screens/depts";
 import { employee, employees } from "./screens/employees";
+import { adjustStock, count, counts, stock, stockLedger, transfer, transfers } from "./screens/inventory";
 import { item, items } from "./screens/items";
 import { menu } from "./screens/menu";
 import { prices } from "./screens/prices";
@@ -37,6 +38,7 @@ const app = createApp<Env>({
 	},
 	programs: {
 		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
+		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
 		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},
@@ -108,6 +110,10 @@ const app = createApp<Env>({
 		"gift.card": { title: "CARD NUMBER", lines: ["Scan the gift card, or key its 8 to 19 digits."] },
 		"gift.amount": { title: "AMOUNT", lines: ["What goes on the card: 5.00 to 500.00."] },
 		"receipts.sel": { title: "SELECTION CODE", lines: ["S shows a receipt to reprint. V voids a paid sale; a supervisor or", "manager approves it with their PIN."], values: values(["S", "SHOW/REPRINT"], ["V", "VOID"]) },
+		"adjust.reason": { title: "REASON", lines: ["Why on hand is changed."], values: values(["DM", "DAMAGED"], ["SH", "SHRINK"], ["FD", "FOUND"], ["US", "STORE USE"], ["OT", "OTHER"]) },
+		"adjust.qty": { title: "CHANGE", lines: ["How many more there are (5) or fewer (-5). Pounds for a weighed", "item, e.g. -1.25."] },
+		"stock.sel": { title: "SELECTION CODE", lines: ["L shows the item's ledger; A adjusts its on hand."], values: values(["L", "LEDGER"], ["A", "ADJUST"]) },
+		"counts.dept": { title: "DEPARTMENT", lines: ["PF5 starts a cycle count of this department's items. Blank counts", "every item."], values: async (ctx) => deptValues(ctx.env.DB) },
 		"employee.stores": { title: "STORES", lines: ["The store numbers the person works at, separated by commas.", "Blank means every store."] },
 	}),
 	stateKey: (env) => env.STATE_KEY,
