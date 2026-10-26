@@ -2,6 +2,7 @@ import { clock, invalidKey, keys, label, lpad, message, msgId, pad, panel, pf, w
 import { Invalid } from "../data/db";
 import { approves, checkPin } from "../data/pins";
 import { pctText } from "../data/pricing";
+import { reasonNote, reasons } from "../data/reasons";
 import { getSale, lineAmount, postVoid } from "../data/register";
 import { queuePosting } from "../posting";
 import { getStore } from "../data/stores";
@@ -11,15 +12,6 @@ import type { PosCtx } from "../screens/types";
 import { laneScreen, onLane } from "./common";
 import { receiptNo } from "./receipt";
 import type { ApproveState, DiscountState, Pending, SaleState } from "./types";
-
-// Why a price was overridden.
-export const REASONS: Record<string, string> = {
-	PM: "PRICE MATCH",
-	AD: "AD PRICE",
-	MK: "MISMARKED",
-	DM: "DAMAGED",
-	MG: "MANAGER'S CALL",
-};
 
 // readDiscount reads "10%" (hundredths of a percent) or "2.00" (cents).
 function readDiscount(s: string): { pct?: number; amount?: number } | undefined {
@@ -72,7 +64,7 @@ export const discount = onLane(panel<DiscountState, Env>({
 		label(scr, 8, 27, "REASON ===>");
 		scr.input(8, 39, 2, "reason", "", { bright: s.errField === "reason" });
 		scr.text(8, 43, "A PRICE OVERRIDE NEEDS A MANAGER", { color: "blue" });
-		scr.text(9, 4, Object.entries(REASONS).map(([k, v]) => `${k}=${v}`).join("  "), { color: "blue" });
+		scr.text(9, 4, reasonNote(await reasons(ctx.env.DB, "OVERRIDE")).slice(0, scr.cols - 5), { color: "blue" });
 		scr.text(11, 2, "LN SKU            DESCRIPTION                        QTY     PRICE    AMOUNT", { color: "white", bright: true });
 		const room = scr.rows - 3 - 12;
 		const from = Math.max(s.back.lines.length - room, 0);
@@ -131,8 +123,9 @@ export const discount = onLane(panel<DiscountState, Env>({
 			if (priceTyped) {
 				const price = cents(priceTyped);
 				if (!price) return fail("price", "2277E KEY THE NEW PRICE, E.G. 4.99");
-				if (!REASONS[reason]) return fail("reason", `2278E REASON MUST BE ${Object.keys(REASONS).join(", ")}`);
-				p = { line: n, price, reason, what: `LINE ${n} ${l.desc} PRICE ${dollars(l.price)} TO ${dollars(price)} (${REASONS[reason]})` };
+				const why = (await reasons(ctx.env.DB, "OVERRIDE"))[reason];
+				if (!why) return fail("reason", `2278E REASON MUST BE ${Object.keys(await reasons(ctx.env.DB, "OVERRIDE")).join(", ")}`);
+				p = { line: n, price, reason, what: `LINE ${n} ${l.desc} PRICE ${dollars(l.price)} TO ${dollars(price)} (${why})` };
 				needs = true;
 			} else {
 				const d = readDiscount(discTyped);

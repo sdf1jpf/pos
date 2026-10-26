@@ -6,6 +6,7 @@ import { accessAuth, createApp, helpTable, msgId, time, userIdFor, values } from
 import { tso } from "@greenscreen-dev/worker/sessions";
 import { who } from "./access";
 import { listDepartments } from "./data/items";
+import { reasons, type Kind } from "./data/reasons";
 import { registerForToken } from "./data/register";
 import type { Env } from "./env";
 import { signOn } from "./register/common";
@@ -16,6 +17,8 @@ import { receiptPanel, receipts } from "./register/receipt";
 import { returnPanel } from "./register/returns";
 import { card, sale, tender } from "./register/sale";
 import { laneSelect, opendrawer, signon } from "./register/signon";
+import { audit, auditRow, reasonCodes } from "./screens/audit";
+import { customer as customerScreen, customers, giftcard } from "./screens/customers";
 import { depts } from "./screens/depts";
 import { employee, employees } from "./screens/employees";
 import { closeDay, days, zreport } from "./screens/endofday";
@@ -43,6 +46,7 @@ const app = createApp<Env>({
 		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
 		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport, timecards, timecard, schedule,
+		customers, custfile: customerScreen, giftcard, audit, auditrow: auditRow, reasons: reasonCodes,
 		lane: laneSelect, signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},
@@ -95,11 +99,19 @@ const app = createApp<Env>({
 		"promotion.items": { title: "ITEMS", lines: ["The SKUs on promotion, separated by commas. A line takes at most", "one promotion, and none once its price is overridden or discounted."] },
 		"coupon.value": { title: "VALUE", lines: ["A percent off (10%) or an amount off (2.00), from the item, the", "department's items, or the whole sale."] },
 		"discount.disc": { title: "DISCOUNT", lines: ["A percent (10%) or an amount (2.00) off the line, or a percent off", "the whole sale with LINE blank. 0 takes a discount off. Over the", "store's limit, a supervisor or manager approves it."] },
-		"discount.reason": { title: "REASON", lines: ["Why the price is overridden."], values: values(["PM", "PRICE MATCH"], ["AD", "AD PRICE"], ["MK", "MISMARKED"], ["DM", "DAMAGED"], ["MG", "MANAGER'S CALL"]) },
 		"employee.pin": { title: "REGISTER PIN", lines: ["Four digits the person keys with their operator ID to sign on at a", "register or approve an override. Setting one unlocks someone locked", "out after three wrong PINs. Blank leaves the PIN as it is."] },
 		"lane.store": { title: "STORE", lines: ["The store whose register to run on this terminal."] },
 		"lane.reg": { title: "REGISTER", lines: ["The register to run. Its sales go in its own drawer."] },
 		"signon.operator": { title: "OPERATOR ID", lines: ["The number on your employee record, 3 to 6 digits.", "Enter signs on; PF9 clocks you in, or out if you are on the clock."] },
+		"customers.q": { title: "SEARCH", lines: ["A word in the customer's name, or any part of their phone number.", "Blank lists everyone."] },
+		"custfile.phone": { title: "PHONE", lines: ["Ten digits. The register finds a customer by it, so no two", "customers share one."] },
+		"custfile.exempt": { title: "TAX EXEMPT", lines: ["Y if the customer's purchases carry no sales tax. Key their", "certificate number too."], values: yesNo },
+		"custfile.status": { title: "STATUS", lines: ["An inactive customer isn't found at the register."], values: values(["A", "ACTIVE"], ["I", "INACTIVE"]) },
+		"giftcard.card": { title: "CARD NUMBER", lines: ["A gift card's 8 to 19 digits, or a store credit number: SC and", "12 digits, as printed on the receipt."] },
+		"giftcard.amount": { title: "ADJUST", lines: ["An amount to add to the balance, e.g. 5.00, or to take off,", "e.g. -5.00. Needs a reason code."] },
+		"audit.action": { title: "ACTION", lines: ["The start of the action: TIME shows every time clock entry,", "SALE.VOID only post-voids. Blank shows everything."] },
+		"audit.before": { title: "ON OR BEFORE", lines: ["Show what happened on or before this day, YYYY-MM-DD.", "Blank is up to now."] },
+		"reasons.kind": { title: "KIND", lines: ["Which reasons to keep."], values: values(["ADJUST", "STOCK ADJUSTMENTS"], ["OVERRIDE", "PRICE OVERRIDES"], ["CARD", "GIFT CARD CHANGES"]) },
 		"timecards.week": { title: "WEEK OF", lines: ["Any day of the week to show, YYYY-MM-DD. Weeks run Monday to Sunday."] },
 		"timecard.reason": { title: "REASON", lines: ["Why the punches are being changed. It is kept with each punch", "changed and in the audit log."] },
 		"schedule.week": { title: "WEEK OF", lines: ["Any day of the week to schedule, YYYY-MM-DD. Weeks run Monday to Sunday."] },
@@ -118,7 +130,9 @@ const app = createApp<Env>({
 		"gift.card": { title: "CARD NUMBER", lines: ["Scan the gift card, or key its 8 to 19 digits."] },
 		"gift.amount": { title: "AMOUNT", lines: ["What goes on the card: 5.00 to 500.00."] },
 		"receipts.sel": { title: "SELECTION CODE", lines: ["S shows a receipt to reprint. V voids a paid sale; a supervisor or", "manager approves it with their PIN."], values: values(["S", "SHOW/REPRINT"], ["V", "VOID"]) },
-		"adjust.reason": { title: "REASON", lines: ["Why on hand is changed."], values: values(["DM", "DAMAGED"], ["SH", "SHRINK"], ["FD", "FOUND"], ["US", "STORE USE"], ["OT", "OTHER"]) },
+		"adjust.reason": { title: "REASON", lines: ["Why on hand is changed. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "ADJUST") },
+		"discount.reason": { title: "REASON", lines: ["Why the price is overridden. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "OVERRIDE") },
+		"giftcard.reason": { title: "REASON", lines: ["Why the balance is changed. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "CARD") },
 		"adjust.qty": { title: "CHANGE", lines: ["How many more there are (5) or fewer (-5). Pounds for a weighed", "item, e.g. -1.25."] },
 		"stock.sel": { title: "SELECTION CODE", lines: ["L shows the item's ledger; A adjusts its on hand."], values: values(["L", "LEDGER"], ["A", "ADJUST"]) },
 		"counts.dept": { title: "DEPARTMENT", lines: ["PF5 starts a cycle count of this department's items. Blank counts", "every item."], values: async (ctx) => deptValues(ctx.env.DB) },
@@ -130,6 +144,10 @@ const app = createApp<Env>({
 	// Sessions and record locks: a register runs on one terminal at a time.
 	sessions: (env) => (env.SESSIONS ? tso(env.SESSIONS) : undefined),
 });
+
+async function reasonValues(db: D1Database, kind: Kind) {
+	return Object.entries(await reasons(db, kind)).map(([code, desc]) => ({ code, desc }));
+}
 
 async function deptValues(db: D1Database) {
 	return (await listDepartments(db)).filter((d) => d.status === "A").map((d) => ({ code: String(d.dept), desc: d.name }));

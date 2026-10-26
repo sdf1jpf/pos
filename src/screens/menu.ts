@@ -21,7 +21,8 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 			{ key: "3", name: "PURCHASING", desc: "Vendors, orders, receiving", aliases: ["PU"], sub: "3" },
 			{ key: "4", name: "EMPLOYEES", desc: "People, time cards, schedule", aliases: ["E"], sub: "4" },
 			{ key: "5", name: "END OF DAY", desc: "Close the day, Z reports", aliases: ["EOD"], sub: "5" },
-			{ key: "8", name: "ADMIN", desc: "Stores and registers", aliases: ["A"], sub: "8" },
+			{ key: "7", name: "CUSTOMERS", desc: "Customers, gift cards, store credit", aliases: ["C"], sub: "7" },
+			{ key: "8", name: "ADMIN", desc: "Stores, registers, audit log", aliases: ["A"], sub: "8" },
 			{ key: "R", name: "REGISTER", desc: "Run a register on this terminal", right: "register", go: go("lane") },
 			{ key: "X", name: "EXIT", desc: "Log off", go: (ctx) => logoff(ctx) },
 		],
@@ -75,12 +76,22 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 			{ key: "2", name: "DAYS", desc: "Closed days and Z reports", aliases: ["Z"], right: "endofday", go: go("days") },
 		],
 	},
+	"7": {
+		map: "POSM07",
+		title: "CUSTOMERS",
+		options: [
+			{ key: "1", name: "CUSTOMERS", desc: "The customer file", aliases: ["C"], right: "customers", go: go("customers") },
+			{ key: "2", name: "GIFT CARDS", desc: "Gift card and store credit balances", aliases: ["G"], right: "customers", go: go("giftcard") },
+		],
+	},
 	"8": {
 		map: "POSM08",
 		title: "STORES AND ADMIN",
 		options: [
 			{ key: "1", name: "STORES", desc: "Stores and receipts", aliases: ["S"], right: "stores", go: go("stores") },
 			{ key: "2", name: "REGISTERS", desc: "Registers by store", aliases: ["R"], right: "stores", go: go("registers") },
+			{ key: "3", name: "AUDIT LOG", desc: "Every change, who and when", aliases: ["L"], right: "audit", go: go("audit") },
+			{ key: "4", name: "REASON CODES", desc: "Adjustment, override and card reasons", aliases: ["RC"], right: "stores", go: (_ctx, back) => ({ p: "reasons", back, kind: "ADJUST" }) },
 		],
 	},
 };
@@ -102,7 +113,7 @@ const built = new Map<string, ReturnType<typeof menuProgram<Env>>>();
 
 async function menuOf(ctx: PosCtx) {
 	const w = await who(ctx);
-	const rights = (["items", "prices", "inventory", "purchasing", "endofday", "timeclock", "stores", "employees", "register"] as const).filter((r) => can(w, r));
+	const rights = (["items", "prices", "inventory", "purchasing", "endofday", "timeclock", "customers", "audit", "stores", "employees", "register"] as const).filter((r) => can(w, r));
 	const key = rights.join(",");
 	let m = built.get(key);
 	if (!m) {

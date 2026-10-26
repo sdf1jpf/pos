@@ -5,6 +5,7 @@
 
 import { audit, changed, Invalid, now, text } from "./db";
 import { getItem } from "./items";
+import { checkReason } from "./reasons";
 
 // --- Quantities ---
 
@@ -123,14 +124,12 @@ export async function ledger(db: D1Database, store: number, sku: string, offset:
 
 // --- Adjustments ---
 
-export const REASONS: Record<string, string> = { DM: "DAMAGED", SH: "SHRINK", FD: "FOUND", US: "STORE USE", OT: "OTHER" };
-
 // adjust changes on hand by qty, with a reason. token names the adjustment,
 // so one keyed twice is made once.
 export async function adjust(
 	db: D1Database, userid: string, token: string, store: number, sku: string, qty: number, reason: string,
 ): Promise<void> {
-	if (!REASONS[reason]) throw new Invalid("reason", `REASON MUST BE ${Object.keys(REASONS).join(", ")}`);
+	await checkReason(db, "ADJUST", reason);
 	if (qty === 0) throw new Invalid("qty", "KEY HOW MANY MORE (OR -FEWER) THERE ARE");
 	const at = now();
 	try {
