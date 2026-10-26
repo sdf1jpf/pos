@@ -24,6 +24,10 @@ export interface SaleState extends PanelState {
 	voiding?: boolean; // PF12 pressed once: again voids the sale
 	errField?: string;
 }
+// An item lookup from the sale: what was searched for, and the page shown.
+export interface LookupState extends PanelState {
+	p: "lookup"; lane: Lane; back: SaleState; q: string; top?: number; total?: number; keys?: string[]; errSel?: string;
+}
 export interface TenderState extends PanelState { p: "tender"; lane: Lane; back: SaleState; errField?: string }
 // A card tender waiting on the card terminal. amount is in cents, positive
 // for a refund too.

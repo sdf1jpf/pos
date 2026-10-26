@@ -4,7 +4,7 @@ import { Invalid } from "../data/db";
 import { coupon, couponsIn, lineAdj, price, promosFor, wholeAdj, type Priced } from "../data/pricing";
 import {
 	DrawerClosed, findItem, laneAudit, lineAmount, paid, registerInfo, writeSale,
-	type Line, type Tender, type TenderKind,
+	type Line, type Rung, type Tender, type TenderKind,
 } from "../data/register";
 import type { Env } from "../env";
 import { queuePosting } from "../posting";
@@ -13,7 +13,7 @@ import type { PosCtx } from "../screens/types";
 import { laneScreen, newSale, onLane, readQty, showQty, signOn } from "./common";
 import { runCard } from "../data/cardterm";
 import { saleNo } from "./receipt";
-import type { CardState, DiscountState, FunctionsState, ReceiptState, SaleState, TenderState } from "./types";
+import type { CardState, DiscountState, FunctionsState, LookupState, ReceiptState, SaleState, TenderState } from "./types";
 
 const MAX_LINES = 60;
 const MAX_COUPONS = 5;
@@ -55,7 +55,8 @@ function rows(s: SaleState, p: Priced): Row[] {
 // POS220 SALE: items keyed or scanned, one line each, with the running
 // total. Enter rings the item; PF5 takes payment. QTY shows 1 and is left
 // alone by a scan, so a scanner that sends the UPC and Enter rings one
-// with no other key. PF10 changes the quantity of the last line.
+// with no other key. PF10 changes the quantity of the last line. PF11 looks
+// an item up by description, SKU or UPC.
 
 export const sale = onLane(panel<SaleState, Env>({
 	async render(ctx, s) {
@@ -98,7 +99,7 @@ export const sale = onLane(panel<SaleState, Env>({
 		const p = paid(s.tenders);
 		if (p > 0) scr.text(scr.rows - 2, 34, `PAID ${lpad(dollars(p), 9)}   BALANCE DUE ${lpad(dollars(t.total - p), 9)}`, { color: "yellow", bright: true });
 		message(scr, s.msg ?? "");
-		keys(scr, "PF2=PRICE PF3=SIGNOFF PF4=FUNC PF5=TENDER PF6=VOID LN PF9=DISC PF10=QTY PF12=VOID");
+		keys(scr, "PF 2=PRICE 3=SIGNOFF 4=FUNC 5=TENDER 6=VOID LN 9=DISC 10=QTY 11=LOOKUP 12=VOID");
 		scr.cursorTo(s.errField ?? "item");
 		return scr;
 	},
@@ -127,24 +128,20 @@ export const sale = onLane(panel<SaleState, Env>({
 				}
 				const it = await findItem(ctx.env.DB, s.lane.store, code);
 				if (!it && inp.aid === "ENTER" && (await coupon(ctx.env.DB, code))) return takeCoupon(ctx, s, code, fail);
-				if (!it) return fail("item", `2203E ITEM ${code} NOT FOUND`);
+				if (!it) return fail("item", `2203E ITEM ${code} NOT FOUND - PF11 LOOKS IT UP`);
 				if (it === "discontinued") return fail("item", `2204E ITEM ${code} IS DISCONTINUED - IT CAN'T BE SOLD`);
 				if (inp.aid === pf(2)) {
 					s.msg = `${msgId(ctx, "2205I")} ${it.sku} ${it.desc} ${dollars(it.price)}${it.weighed ? " PER LB" : ""}${it.taxable ? " TAXABLE" : ""}`;
 					return s;
 				}
-				if (it.price <= 0) return fail("item", `2206E ITEM ${it.sku} HAS NO PRICE - SEE A MANAGER`);
 				// The 1 QTY shows is a count, never pounds: a weighed item needs them keyed.
 				const qty = readQty(it.weighed ? typed("qty") : (inp.fields.qty ?? ""), it.weighed);
 				if (qty === undefined) {
 					return it.weighed ? fail("qty", `2207E ${it.desc} IS SOLD BY WEIGHT - KEY THE POUNDS, E.G. 1.25`, { item: code, qty: "" })
 						: fail("qty", "2208E QTY MUST BE 1 TO 999", { item: code });
 				}
-				if (s.lines.length >= MAX_LINES) return fail("item", `2209E A SALE HOLDS AT MOST ${MAX_LINES} LINES - TENDER THIS ONE`);
-				const line: Line = { sku: it.sku, desc: it.desc, dept: it.dept, qty, price: it.price, amount: lineAmount(qty, it.price), taxable: it.taxable, weighed: it.weighed };
-				s.lines.push(line);
-				s.msg = `${msgId(ctx, "2210I")} ${line.desc} ${showQty(qty, it.weighed)} @ ${dollars(it.price)} = ${dollars(line.amount)}`;
-				return s;
+				const err = ring(ctx, s, it, qty);
+				return err ? fail("item", err) : s;
 			}
 			case pf(6): {
 				if (s.tenders.length > 0) return fail("line", "2211E PAYMENT HAS STARTED - REMOVE IT FIRST (PF5, THEN PF6)");
@@ -200,6 +197,9 @@ export const sale = onLane(panel<SaleState, Env>({
 				return { p: "tender", lane: s.lane, back: s } satisfies TenderState;
 			case pf(4):
 				return { p: "functions", lane: s.lane, back: s } satisfies FunctionsState;
+			case pf(11):
+				// What was typed in ITEM, if anything, is what to look for.
+				return { p: "lookup", lane: s.lane, back: s, q: code } satisfies LookupState;
 			case pf(3):
 				if (s.lines.length > 0) return fail("item", "2219E FINISH OR VOID THE SALE FIRST");
 				await laneAudit(ctx.env.DB, s.lane, "REG.SIGNOFF");
@@ -209,6 +209,17 @@ export const sale = onLane(panel<SaleState, Env>({
 		return s;
 	},
 }));
+
+// ring adds a line for an item to the sale, or says why it can't: the
+// error, without its prefix, for the caller to show.
+export function ring(ctx: PosCtx, s: SaleState, it: Rung, qty: number): string | undefined {
+	if (it.price <= 0) return `2206E ITEM ${it.sku} HAS NO PRICE - SEE A MANAGER`;
+	if (s.lines.length >= MAX_LINES) return `2209E A SALE HOLDS AT MOST ${MAX_LINES} LINES - TENDER THIS ONE`;
+	const line: Line = { sku: it.sku, desc: it.desc, dept: it.dept, qty, price: it.price, amount: lineAmount(qty, it.price), taxable: it.taxable, weighed: it.weighed };
+	s.lines.push(line);
+	s.msg = `${msgId(ctx, "2210I")} ${line.desc} ${showQty(qty, it.weighed)} @ ${dollars(it.price)} = ${dollars(line.amount)}`;
+	return undefined;
+}
 
 // takeCoupon adds a coupon scanned or keyed in the item field, if it is in
 // force and comes off something in the sale.
