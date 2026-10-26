@@ -21,6 +21,7 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 			{ key: "3", name: "PURCHASING", desc: "Vendors, orders, receiving", aliases: ["PU"], sub: "3" },
 			{ key: "4", name: "EMPLOYEES", desc: "People, time cards, schedule", aliases: ["E"], sub: "4" },
 			{ key: "5", name: "END OF DAY", desc: "Close the day, Z reports", aliases: ["EOD"], sub: "5" },
+			{ key: "6", name: "REPORTS", desc: "Sales, margin, inventory; print to PDF", aliases: ["RP"], right: "reports", go: go("reports") },
 			{ key: "7", name: "CUSTOMERS", desc: "Customers, gift cards, store credit", aliases: ["C"], sub: "7" },
 			{ key: "8", name: "ADMIN", desc: "Stores, registers, audit log", aliases: ["A"], sub: "8" },
 			{ key: "R", name: "REGISTER", desc: "Run a register on this terminal", right: "register", go: go("lane") },
@@ -113,7 +114,7 @@ const built = new Map<string, ReturnType<typeof menuProgram<Env>>>();
 
 async function menuOf(ctx: PosCtx) {
 	const w = await who(ctx);
-	const rights = (["items", "prices", "inventory", "purchasing", "endofday", "timeclock", "customers", "audit", "stores", "employees", "register"] as const).filter((r) => can(w, r));
+	const rights = (["items", "prices", "inventory", "purchasing", "endofday", "timeclock", "customers", "audit", "reports", "stores", "employees", "register"] as const).filter((r) => can(w, r));
 	const key = rights.join(",");
 	let m = built.get(key);
 	if (!m) {

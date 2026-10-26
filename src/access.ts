@@ -27,14 +27,15 @@ export type Right =
 	| "timeclock" // time cards and the schedule
 	| "customers" // the customer file, gift cards and store credit
 	| "audit" // read the audit log
+	| "reports" // sales and inventory reports
 	| "register"; // run a register from the back office
 
 const RIGHTS: Record<Role, Right[]> = {
 	CASHIER: [],
 	SUPERVISOR: ["register"],
-	MANAGER: ["prices", "inventory", "purchasing", "endofday", "timeclock", "customers", "audit", "register"],
-	BUYER: ["items", "prices", "inventory", "purchasing"],
-	ADMIN: ["items", "prices", "inventory", "purchasing", "endofday", "timeclock", "customers", "audit", "stores", "employees", "register"],
+	MANAGER: ["prices", "inventory", "purchasing", "endofday", "timeclock", "customers", "audit", "reports", "register"],
+	BUYER: ["items", "prices", "inventory", "purchasing", "reports"],
+	ADMIN: ["items", "prices", "inventory", "purchasing", "endofday", "timeclock", "customers", "audit", "reports", "stores", "employees", "register"],
 };
 
 export function can(who: Who | undefined, right: Right): boolean {

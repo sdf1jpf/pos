@@ -2,6 +2,7 @@
 // commarea; "p" names the panel, "back" is where PF3 goes.
 
 import type { Ctx, PanelState } from "@greenscreen-dev/worker";
+import type { ReportCode } from "../data/reports";
 import type { Env } from "../env";
 
 export type PosCtx = Ctx<Env>;
@@ -52,3 +53,6 @@ export interface CardState extends PanelState { p: "giftcard"; back: PanelState;
 export interface AuditState extends ListState { p: "audit"; store?: number; userid?: string; action?: string; before?: string; errField?: string }
 export interface AuditRowState extends PanelState { p: "auditrow"; back: PanelState; id: number }
 export interface ReasonsState extends PanelState { p: "reasons"; back: PanelState; kind: string; keys?: string[]; errField?: string }
+export interface ReportsState extends PanelState { p: "reports"; back: PanelState; report?: string; store?: number; from?: string; to?: string; errField?: string }
+// stores: the stores reported on; none is every store.
+export interface ReportState extends PanelState { p: "report"; back: PanelState; report: ReportCode; stores: number[]; from: string; to: string; top?: number }
