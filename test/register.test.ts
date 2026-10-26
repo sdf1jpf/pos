@@ -108,7 +108,7 @@ describe("sign-on", () => {
 
 		const admin = terminal("ADMIN");
 		await admin.key("START");
-		await admin.key("ENTER", { option: "4" });
+		await admin.key("ENTER", { option: "4.1" });
 		r = await admin.key("ENTER", { "sel:5": "S" });
 		expect(text(r)).toContain("LOCKED OUT");
 		r = await admin.key("ENTER", { pin: "4321" });

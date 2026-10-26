@@ -24,7 +24,7 @@ describe("sign-on", () => {
 		};
 		expect(await options("ADMIN")).toEqual(["PRODUCTS", "INVENTORY", "PURCHASING", "EMPLOYEES", "END OF DAY", "ADMIN", "REGISTER", "EXIT"]);
 		expect(await options("BUYER")).toEqual(["PRODUCTS", "INVENTORY", "PURCHASING", "EXIT"]);
-		expect(await options("MANAGER")).toEqual(["PRODUCTS", "INVENTORY", "PURCHASING", "END OF DAY", "REGISTER", "EXIT"]);
+		expect(await options("MANAGER")).toEqual(["PRODUCTS", "INVENTORY", "PURCHASING", "EMPLOYEES", "END OF DAY", "REGISTER", "EXIT"]);
 
 		const t = terminal("MANAGER");
 		await t.key("START");

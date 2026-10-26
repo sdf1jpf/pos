@@ -26,6 +26,7 @@ import { prices } from "./screens/prices";
 import { po, pos, reorder, suggested, vendor, vendorReturn, vendors } from "./screens/purchasing";
 import { coupon, coupons, promotion, promotions } from "./screens/promos";
 import { registers, store, stores } from "./screens/stores";
+import { schedule, timecard, timecards } from "./screens/timeclock";
 
 export type { Env };
 
@@ -41,7 +42,7 @@ const app = createApp<Env>({
 	programs: {
 		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
-		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport,
+		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport, timecards, timecard, schedule,
 		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},
@@ -98,7 +99,11 @@ const app = createApp<Env>({
 		"employee.pin": { title: "REGISTER PIN", lines: ["Four digits the person keys with their operator ID to sign on at a", "register or approve an override. Setting one unlocks someone locked", "out after three wrong PINs. Blank leaves the PIN as it is."] },
 		"lane.store": { title: "STORE", lines: ["The store whose register to run on this terminal."] },
 		"lane.reg": { title: "REGISTER", lines: ["The register to run. Its sales go in its own drawer."] },
-		"signon.operator": { title: "OPERATOR ID", lines: ["The number on your employee record, 3 to 6 digits."] },
+		"signon.operator": { title: "OPERATOR ID", lines: ["The number on your employee record, 3 to 6 digits.", "Enter signs on; PF9 clocks you in, or out if you are on the clock."] },
+		"timecards.week": { title: "WEEK OF", lines: ["Any day of the week to show, YYYY-MM-DD. Weeks run Monday to Sunday."] },
+		"timecard.reason": { title: "REASON", lines: ["Why the punches are being changed. It is kept with each punch", "changed and in the audit log."] },
+		"schedule.week": { title: "WEEK OF", lines: ["Any day of the week to schedule, YYYY-MM-DD. Weeks run Monday to Sunday."] },
+		"schedule.sh": { title: "SHIFT", lines: ["Start and end, local time: 0900-1700, 9-17 or 9:30-17:30.", "A shift that ends before it starts ends the next day. Blank is a day off."] },
 		"sale.item": { title: "ITEM", lines: ["Scan the barcode, or key the SKU or UPC, and press Enter.", "PF2 shows the price without ringing it."] },
 		"sale.qty": { title: "QTY", lines: ["How many, 1 to 999; blank is 1. For an item sold by weight, the", "pounds from the scale, e.g. 1.25."] },
 		"sale.line": { title: "LINE", lines: ["The line number to void with PF6. Blank voids the last line."] },
