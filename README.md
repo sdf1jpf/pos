@@ -93,7 +93,11 @@ Rules worth knowing:
   on the day after.
 - **Roles.** Cloudflare Access says who someone is; the employee file
   (`employees.userid`) gives their role and the stores they're limited to.
-  Cashiers and people not on file can't sign on to the back office. Every
+  People not on file can't sign on. A cashier with a userid and an
+  operator ID goes straight to POS201 to start a register as themselves:
+  Access has already said who they are, so there is no PIN to key. Shared
+  registers enrolled with a service token still sign on by operator ID
+  and PIN. Cashiers never reach the back office. Every
   panel checks the role on every key, so a change takes effect at once.
   The userids in `ADMIN_USERS` are administrators of every store even when
   not on file, so the first person can sign on and add everyone else.
@@ -130,6 +134,7 @@ Durable Object).
 
 | Map | Panel |
 | --- | --- |
+| POS201 | Start your register: a cashier signed on through Access with their own login picks a register, and signs on to it as themselves, with no operator ID or PIN |
 | POS210 | Sign on: operator ID and 4-digit PIN. Three wrong PINs lock the operator out until an admin sets a new PIN (POS411). PF9 clocks the operator in or out |
 | POS211 | Open the drawer: the float, counted by denomination; PF10 opens it |
 | POS220 | Sale: scan or key a SKU or UPC, a quantity or a weight in pounds. PF2 checks a price, PF6 voids a line, PF12 (twice) voids the sale |

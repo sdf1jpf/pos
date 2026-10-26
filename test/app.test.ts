@@ -9,11 +9,10 @@ describe("sign-on", () => {
 		expect(info).toMatchObject({ title: "POINT OF SALE", prefix: "POS", system: "POS1" });
 	});
 
-	it("turns away people who are not on file and cashiers", async () => {
-		for (const user of ["STRANGER", "CASHIER"]) {
-			const r = await terminal(user).key("START");
-			expect(r.logoff?.message).toContain(`POS0001E ${user} IS NOT AUTHORIZED FOR THE BACK OFFICE`);
-		}
+	it("turns away people who are not on file, and sends cashiers to their register", async () => {
+		const r = await terminal("STRANGER").key("START");
+		expect(r.logoff?.message).toContain("POS0001E STRANGER IS NOT AUTHORIZED FOR THE BACK OFFICE");
+		expect(map(await terminal("CASHIER").key("START"))).toBe("POS201");
 	});
 
 	it("shows each role only its options", async () => {

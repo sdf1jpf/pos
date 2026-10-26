@@ -49,6 +49,14 @@ export async function employeeByUserid(db: D1Database, userid: string): Promise<
 	return r ? (await withStores(db, [r]))[0] : undefined;
 }
 
+// clerkByUserid finds the active cashier a userid signed on through Access
+// belongs to: someone with an operator ID, who runs a register as
+// themselves without keying it and a PIN.
+export async function clerkByUserid(db: D1Database, userid: string): Promise<Employee | undefined> {
+	const e = await employeeByUserid(db, userid);
+	return e && e.role === "CASHIER" && e.operator ? e : undefined;
+}
+
 // checkEmployee turns what was typed into an employee's fields, or throws
 // Invalid naming the field that is wrong.
 export async function checkEmployee(db: D1Database, inp: EmployeeInput): Promise<Omit<Employee, "emp" | "version" | "updatedAt" | "updatedBy">> {

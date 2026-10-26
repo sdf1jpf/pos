@@ -5,6 +5,7 @@
 import { accessAuth, createApp, helpTable, msgId, time, user, userIdFor, values } from "@greenscreen-dev/worker";
 import { tso } from "@greenscreen-dev/worker/sessions";
 import { who } from "./access";
+import { clerkByUserid } from "./data/employees";
 import { listDepartments } from "./data/items";
 import { reasons, type Kind } from "./data/reasons";
 import { REPORTS } from "./data/reports";
@@ -17,7 +18,7 @@ import { customer, gift, resumePanel } from "./register/extras";
 import { receiptPanel, receipts } from "./register/receipt";
 import { returnPanel } from "./register/returns";
 import { card, sale, tender } from "./register/sale";
-import { laneSelect, opendrawer, signon } from "./register/signon";
+import { clerkLane, laneSelect, opendrawer, signon } from "./register/signon";
 import { audit, auditRow, reasonCodes } from "./screens/audit";
 import { customer as customerScreen, customers, giftcard } from "./screens/customers";
 import { depts } from "./screens/depts";
@@ -49,7 +50,7 @@ const app = createApp<Env>({
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
 		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport, timecards, timecard, schedule,
 		customers, custfile: customerScreen, giftcard, audit, auditrow: auditRow, reasons: reasonCodes, reports, report,
-		lane: laneSelect, signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
+		lane: laneSelect, clerklane: clerkLane, signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},
 	// People sign on through Cloudflare Access as their userid. A register
@@ -61,6 +62,8 @@ const app = createApp<Env>({
 	async start(ctx) {
 		const reg = await registerForToken(ctx.env.DB, ctx.user);
 		if (reg) return signOn(reg.store, reg.reg, "device");
+		// A clerk signed on through Access with their own login goes to their register.
+		if (!(await who(ctx)) && (await clerkByUserid(ctx.env.DB, ctx.user))) return { p: "clerklane" };
 		if (!(await who(ctx))) {
 			return { logoff: `${msgId(ctx, "0001E")} ${ctx.user} IS NOT AUTHORIZED FOR THE BACK OFFICE - SEE YOUR ADMINISTRATOR` };
 		}
@@ -142,6 +145,7 @@ const app = createApp<Env>({
 		"counts.dept": { title: "DEPARTMENT", lines: ["PF5 starts a cycle count of this department's items. Blank counts", "every item."], values: async (ctx) => deptValues(ctx.env.DB) },
 		"vendor.leadDays": { title: "LEAD TIME", lines: ["Days from ordering to delivery. Suggested orders cover sales over", "the lead time plus two weeks."] },
 		"pos.sel": { title: "SELECTION CODE", lines: ["S shows a purchase order: to order a draft, or receive a delivery."], values: values(["S", "SHOW/RECEIVE"]) },
+		"employee.userid": { title: "USERID", lines: ["How the person signs on through Cloudflare Access: the part of their", "email before the @, letters and digits only, the first 8. A cashier", "with one goes straight to their register, with no operator ID or PIN."] },
 		"employee.stores": { title: "STORES", lines: ["The store numbers the person works at, separated by commas.", "Blank means every store."] },
 	}),
 	stateKey: (env) => env.STATE_KEY,
