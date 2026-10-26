@@ -95,8 +95,10 @@ export async function openDrawer(db: D1Database, lane: Lane, counts: Counts): Pr
 	const at = now();
 	try {
 		await db.batch([
-			db.prepare("INSERT INTO drawers (store, reg, opened_at, opened_by, opening, counts) VALUES (?, ?, ?, ?, ?, ?)")
-				.bind(lane.store, lane.reg, at, lane.emp, opening, JSON.stringify(counts)),
+			// The drawer belongs to the store's business day.
+			db.prepare(`INSERT INTO drawers (store, reg, opened_at, opened_by, opening, counts, day)
+				VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(NULLIF(business_day, ''), date('now')) FROM stores WHERE store = ?))`)
+				.bind(lane.store, lane.reg, at, lane.emp, opening, JSON.stringify(counts), lane.store),
 			audit(db, opUser(lane), { action: "DRAWER.OPEN", subject: `${lane.store}/${lane.reg}`, detail: `opening=${opening}`, store: lane.store, reg: lane.reg }, at),
 		]);
 	} catch (e) {

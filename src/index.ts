@@ -18,6 +18,7 @@ import { sale, tender } from "./register/sale";
 import { laneSelect, opendrawer, signon } from "./register/signon";
 import { depts } from "./screens/depts";
 import { employee, employees } from "./screens/employees";
+import { closeDay, days, zreport } from "./screens/endofday";
 import { adjustStock, count, counts, stock, stockLedger, transfer, transfers } from "./screens/inventory";
 import { item, items } from "./screens/items";
 import { menu } from "./screens/menu";
@@ -40,7 +41,7 @@ const app = createApp<Env>({
 	programs: {
 		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
-		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn,
+		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport,
 		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},

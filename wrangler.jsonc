@@ -28,6 +28,8 @@
 		"consumers": [{ "queue": "greenscreen-pos-posting", "max_batch_size": 20, "max_batch_timeout": 2, "max_retries": 10 }]
 	},
 	"triggers": { "crons": ["*/5 * * * *"] },
+	// Closing a store's day: post its sales, make its Z report, move it on.
+	"workflows": [{ "name": "greenscreen-pos-close-day", "binding": "CLOSE_DAY", "class_name": "CloseDay" }],
 	// Cloudflare Access guards the back office; the Worker verifies its JWT.
 	// ACCESS_AUD is the audience tag of the Access application for
 	// greenscreen-pos.justin-frank.workers.dev (see README).

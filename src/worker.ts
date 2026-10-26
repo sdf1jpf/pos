@@ -1,11 +1,12 @@
 // The Worker's entry: the app, the queue consumer and cron sweep that post
-// sales to the stock ledger, and the Durable Object that keeps sessions and
-// record locks.
+// sales to the stock ledger, the end-of-day Workflow, and the Durable
+// Object that keeps sessions and record locks.
 import app from "./index";
 import type { Env } from "./env";
 import { consume, sweep, type Posting } from "./posting";
 
 export { Sessions } from "@greenscreen-dev/worker/sessions";
+export { CloseDay } from "./closeday";
 
 export default {
 	fetch: app.fetch,

@@ -20,6 +20,7 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 			{ key: "2", name: "INVENTORY", desc: "On hand, counts, transfers", aliases: ["IN"], sub: "2" },
 			{ key: "3", name: "PURCHASING", desc: "Vendors, orders, receiving", aliases: ["PU"], sub: "3" },
 			{ key: "4", name: "EMPLOYEES", desc: "People and roles", aliases: ["E"], right: "employees", go: go("employees") },
+			{ key: "5", name: "END OF DAY", desc: "Close the day, Z reports", aliases: ["EOD"], sub: "5" },
 			{ key: "8", name: "ADMIN", desc: "Stores and registers", aliases: ["A"], sub: "8" },
 			{ key: "R", name: "REGISTER", desc: "Run a register on this terminal", right: "register", go: go("lane") },
 			{ key: "X", name: "EXIT", desc: "Log off", go: (ctx) => logoff(ctx) },
@@ -57,6 +58,14 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 			{ key: "5", name: "RETURNS", desc: "Stock back to a vendor", aliases: ["RV"], right: "purchasing", go: (_ctx, back) => ({ p: "vreturn", back, token: crypto.randomUUID() }) },
 		],
 	},
+	"5": {
+		map: "POSM05",
+		title: "END OF DAY",
+		options: [
+			{ key: "1", name: "CLOSE", desc: "Close the store's day", aliases: ["C"], right: "endofday", go: go("closeday") },
+			{ key: "2", name: "DAYS", desc: "Closed days and Z reports", aliases: ["Z"], right: "endofday", go: go("days") },
+		],
+	},
 	"8": {
 		map: "POSM08",
 		title: "STORES AND ADMIN",
@@ -84,7 +93,7 @@ const built = new Map<string, ReturnType<typeof menuProgram<Env>>>();
 
 async function menuOf(ctx: PosCtx) {
 	const w = await who(ctx);
-	const rights = (["items", "prices", "inventory", "purchasing", "stores", "employees", "register"] as const).filter((r) => can(w, r));
+	const rights = (["items", "prices", "inventory", "purchasing", "endofday", "stores", "employees", "register"] as const).filter((r) => can(w, r));
 	const key = rights.join(",");
 	let m = built.get(key);
 	if (!m) {

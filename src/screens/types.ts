@@ -39,3 +39,7 @@ export interface PoState extends PanelState { p: "po"; back: PanelState; id?: nu
 export interface SuggestState extends PanelState { p: "suggested"; back: PanelState; store?: number; vendor?: string; keys?: string[]; errField?: string }
 export interface ReorderState extends ListState { p: "reorder"; store?: number; vendor?: string; errField?: string }
 export interface VendorReturnState extends PanelState { p: "vreturn"; back: PanelState; token: string; errField?: string }
+// closing: the day whose close this screen started (or reopened), to show how it went.
+export interface CloseState extends PanelState { p: "closeday"; back: PanelState; store?: number; closing?: string; errField?: string }
+export interface DaysState extends ListState { p: "days"; store?: number; errField?: string }
+export interface ZState extends PanelState { p: "zreport"; back: PanelState; store: number; day: string; top?: number }
