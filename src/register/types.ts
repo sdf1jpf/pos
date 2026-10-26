@@ -18,6 +18,7 @@ export interface SaleState extends PanelState {
 	tenders: Tender[];
 	coupons: string[]; // codes, in the order taken
 	saleDisc?: SaleDisc;
+	customer?: { id: number; name: string; phone: string; exempt: boolean };
 	voiding?: boolean; // PF12 pressed once: again voids the sale
 	errField?: string;
 }
@@ -30,6 +31,11 @@ export interface FunctionsState extends PanelState { p: "functions"; lane: Lane;
 export interface PaidState extends PanelState { p: "paid"; lane: Lane; back: SaleState; kind: "PAIDIN" | "PAIDOUT"; token: string; errField?: string }
 export interface CloseDrawerState extends PanelState { p: "closedrawer"; lane: Lane; back: SaleState; counts: Counts; closed?: Closed; errField?: string }
 export interface DiscountState extends PanelState { p: "discount"; lane: Lane; back: SaleState; errField?: string }
+// A return: a receipt recalled (sale), or an item without one.
+export interface ReturnState extends PanelState { p: "return"; lane: Lane; back: SaleState; sale?: number; noReceipt?: boolean; errField?: string; errSel?: string }
+export interface CustomerState extends PanelState { p: "customer"; lane: Lane; back: SaleState; phone?: string; adding?: boolean; errField?: string }
+export interface GiftState extends PanelState { p: "gift"; lane: Lane; back: SaleState; errField?: string }
+export interface ResumeState extends PanelState { p: "resume"; lane: Lane; back: SaleState; keys?: string[]; errSel?: string }
 
 // A discount or override waiting for approval. line is 1-based; none is
 // the sale discount.
@@ -39,6 +45,7 @@ export interface Pending {
 	amount?: number;
 	price?: number; // a price override
 	reason?: string;
+	add?: Line; // a line to add: a return without a receipt
 	what: string; // what is being approved, for the screen and the audit
 }
 
@@ -47,5 +54,5 @@ export interface Pending {
 // discount or price override on the sale being rung (in back.back).
 export type ApproveState = PanelState & { p: "approve"; lane: Lane; back: PanelState; errField?: string } & (
 	| { action: "postvoid"; sale: number }
-	| { action: "adjust"; back: DiscountState; pending: Pending }
+	| { action: "adjust"; back: DiscountState | ReturnState; pending: Pending }
 );

@@ -10,9 +10,9 @@ The plan, in five phases, is the "Greenscreen POS: scope and design" doc.
 Phase 1 laid the foundation: the master-data schema, sign-on through
 Cloudflare Access with roles, and the back-office panels for stores,
 registers, items, departments, price books and employees. Phase 2 is the
-register: sign-on, drawers, sales, tenders, receipts and post-voids, then
-discounts, price overrides, coupons and promotions, with returns and the
-rest to follow.
+register: sign-on, drawers, sales, tenders, receipts and post-voids;
+discounts, price overrides, coupons and promotions; returns, customers,
+suspended sales, gift cards and store credit.
 
 ## The back office
 
@@ -69,9 +69,13 @@ Durable Object).
 | POS211 | Open the drawer: the float, counted by denomination; PF10 opens it |
 | POS220 | Sale: scan or key a SKU or UPC, a quantity or a weight in pounds. PF2 checks a price, PF6 voids a line, PF12 (twice) voids the sale |
 | POS227 | Discount (PF9): a percent or amount off a line, a percent off the sale, or a line's price overridden with a reason |
-| POS230 | Tender: cash (with change), card (last 4 and approval code; recorded, not charged) or check, split as the customer likes |
+| POS230 | Tender: cash (with change), card (last 4 and approval code; recorded, not charged), check, gift card or store credit, split as the customer likes. A negative total is refunded: cash, card or store credit |
 | POS240 | Receipt, with the receipt number store-register-sale and its barcode text |
-| POS225 | Functions between sales: receipts, paid in, paid out, no sale, close drawer, sign off |
+| POS225 | Functions (PF4): receipts, paid in, paid out, no sale, close drawer, sign off and resume between sales; customer, return, gift card and suspend during one |
+| POS232 | Return: a receipt recalled and the quantity coming back keyed beside each line, refunded at what was paid. PF5 returns an item without a receipt, at today's price, as store credit, with approval |
+| POS234 | Customer: found by phone, or added; a tax-exempt customer's sale carries no tax |
+| POS235 | Gift card: sold or reloaded (5.00 to 500.00) as a line on the sale; PF2 shows a card's balance |
+| POS236 | Resume: the sales suspended at this store today, resumed at any of its registers |
 | POS241 | The register's receipts: S reprints, V voids a paid sale |
 | POS290 | Manager approval: a supervisor's, manager's or admin's operator ID and PIN, for a post-void, a discount over the store's limit or any price override |
 | POS250 | Close the drawer: counted blind, then expected, over/short, card and check totals |
@@ -90,6 +94,12 @@ Rules worth knowing:
   an overridden or discounted line); the line's own discount; item and
   department coupons; the sale discount; sale coupons, spread over the
   lines. A coupon is scanned or keyed in the item field.
+- **Returns** are lines with a negative quantity. A line can't come back
+  more times than it was sold; the database refuses the whole sale if it
+  would. Returns, gift cards and store credit take no discounts.
+- **Gift cards and store credit** are loaded, spent and issued only when
+  the sale they're on is paid for, in the same transaction; a card can't
+  go below nothing. Store credit numbers are SC and 12 digits.
 - **Tax** is the store's rate on what the taxable lines come to after
   discounts, rounded once per sale.
 - **Quantities** are kept in thousandths, so a pound and a half of apples

@@ -1,4 +1,6 @@
 import { invalidKey, keys, label, lpad, message, msgId, pad, panel, pf, stamp, withFill } from "@greenscreen-dev/worker";
+import { getCard, giftNumber, newCreditNumber, showPhone } from "../data/customers";
+import { Invalid } from "../data/db";
 import { coupon, couponsIn, lineAdj, price, promosFor, wholeAdj, type Priced } from "../data/pricing";
 import {
 	DrawerClosed, findItem, laneAudit, lineAmount, paid, registerInfo, writeSale,
@@ -26,7 +28,7 @@ export async function priceSale(ctx: PosCtx, s: SaleState): Promise<Priced> {
 		promosFor(db, s.lane.store, at, s.lines.filter((l) => !l.void).map((l) => l.sku)),
 		couponsIn(db, at, s.coupons ?? []),
 	]);
-	return price(s.lines, promos, coupons, s.saleDisc, r?.taxRate ?? 0);
+	return price(s.lines, promos, coupons, s.saleDisc, s.customer?.exempt ? 0 : (r?.taxRate ?? 0));
 }
 
 // One row of the sale as shown: a line as rung, or something taken off.
@@ -59,7 +61,11 @@ export const sale = onLane(panel<SaleState, Env>({
 		scr.input(4, 37, 8, "qty", "", { bright: s.errField === "qty" });
 		label(scr, 4, 47, "LINE ===>");
 		scr.input(4, 57, 2, "line", "", { numeric: true, bright: s.errField === "line" });
-		scr.text(5, 2, "SCAN OR KEY A SKU OR UPC; QTY IS POUNDS FOR A WEIGHED ITEM. LINE IS FOR PF6.", { color: "blue" });
+		if (s.customer) {
+			scr.text(5, 2, `CUSTOMER ${s.customer.name} ${showPhone(s.customer.phone)}${s.customer.exempt ? "  TAX EXEMPT" : ""}`, { color: "turquoise" });
+		} else {
+			scr.text(5, 2, "SCAN OR KEY A SKU OR UPC; QTY IS POUNDS FOR A WEIGHED ITEM. LINE IS FOR PF6.", { color: "blue" });
+		}
 		scr.text(6, 2, "LN SKU            DESCRIPTION                        QTY     PRICE    AMOUNT T", { color: "white", bright: true });
 		scr.text(7, 2, "-".repeat(scr.cols - 3), { color: "blue" });
 		const first = 8;
@@ -152,7 +158,7 @@ export const sale = onLane(panel<SaleState, Env>({
 					return s;
 				}
 				try {
-					const id = await writeSale(ctx.env.DB, s.lane, s.token, s.lines, [], await priceSale(ctx, s), "X");
+					const id = await writeSale(ctx.env.DB, s.lane, s.token, s.lines, [], await priceSale(ctx, s), "X", s.customer?.id);
 					return newSale(s.lane, `${msgId(ctx, "2217I")} SALE ${id} VOIDED`);
 				} catch (e) {
 					return drawerGone(ctx, s, e);
@@ -166,9 +172,9 @@ export const sale = onLane(panel<SaleState, Env>({
 				if (live.length === 0) return fail("item", "2218E RING AN ITEM FIRST");
 				return { p: "tender", lane: s.lane, back: s } satisfies TenderState;
 			case pf(4):
+				return { p: "functions", lane: s.lane, back: s } satisfies FunctionsState;
 			case pf(3):
 				if (s.lines.length > 0) return fail("item", "2219E FINISH OR VOID THE SALE FIRST");
-				if (inp.aid === pf(4)) return { p: "functions", lane: s.lane, back: s } satisfies FunctionsState;
 				await laneAudit(ctx.env.DB, s.lane, "REG.SIGNOFF");
 				return signOn(s.lane.store, s.lane.reg, s.lane.via, `${msgId(ctx, "2110I")} ${s.lane.name} SIGNED OFF`);
 		}
@@ -207,16 +213,29 @@ function drawerGone(ctx: PosCtx, s: SaleState, e: unknown) {
 }
 
 // POS230 TENDER: payment, in as many parts as the customer likes. Cash can
-// be more than is due, for change; a card or check can't. The sale is
-// written when nothing is left to pay.
+// be more than is due, for change; nothing else can. A gift card or store
+// credit pays what it holds. When returns make the total negative it is a
+// refund instead: cash, back to a card, or store credit (only store credit
+// when an item came back without a receipt). The sale is written when
+// nothing is left to pay or refund.
 
-const KINDS: Record<string, TenderKind> = { C: "CASH", CASH: "CASH", D: "CARD", CARD: "CARD", K: "CHECK", CHECK: "CHECK" };
+const KINDS: Record<string, TenderKind> = {
+	C: "CASH", CASH: "CASH", D: "CARD", CARD: "CARD", K: "CHECK", CHECK: "CHECK", G: "GIFT", GIFT: "GIFT", S: "CREDIT", CREDIT: "CREDIT",
+};
+
+const tenderText = (x: Tender) =>
+	x.kind === "CARD" ? `CARD ****${x.ref}` : x.kind === "CHECK" ? `CHECK #${x.ref}` : x.kind === "GIFT" ? `GIFT CARD *${x.ref?.slice(-4)}`
+		: x.kind === "CREDIT" ? `STORE CREDIT ${x.ref}` : "CASH";
+
+// noReceipt is whether anything on the sale came back without a receipt.
+const noReceipt = (s: SaleState) => s.lines.some((l) => !l.void && l.ret && "noReceipt" in l.ret);
 
 export const tender = onLane(panel<TenderState, Env>({
 	async render(ctx, s) {
 		const scr = laneScreen(ctx, "POS230", "TENDER", s.lane);
 		const t = await priceSale(ctx, s.back);
 		const due = t.total - paid(s.back.tenders);
+		const refund = due < 0;
 		const row = (r: number, l: string, v: number, bright = false) => {
 			label(scr, r, 4, l);
 			scr.text(r, 20, lpad(dollars(v), 10), { color: bright ? "white" : "green", bright });
@@ -226,20 +245,21 @@ export const tender = onLane(panel<TenderState, Env>({
 		row(6, "TAX", t.tax);
 		row(7, "TOTAL", t.total, true);
 		s.back.tenders.forEach((x, i) => {
-			scr.text(9 + i, 4, pad(`${i + 1} ${x.kind}${x.ref ? ` ${x.kind === "CARD" ? "****" : "#"}${x.ref}` : ""}`, 24), { color: "turquoise" });
+			scr.text(9 + i, 4, pad(`${i + 1} ${tenderText(x)}`, 24), { color: "turquoise" });
 			scr.text(9 + i, 30, lpad(dollars(x.amount), 10), { color: "green" });
 		});
 		const after = 9 + Math.max(s.back.tenders.length, 1);
-		row(after + 1, "BALANCE DUE", due, true);
+		row(after + 1, refund ? "REFUND DUE" : "BALANCE DUE", Math.abs(due), true);
 		const f = after + 3;
 		label(scr, f, 2, "METHOD ===>");
 		scr.input(f, 14, 5, "method", "", { bright: s.errField === "method" });
-		scr.text(f, 21, "C=CASH  D=CARD  K=CHECK", { color: "blue" });
+		scr.text(f, 21, refund ? (noReceipt(s.back) ? "S=STORE CREDIT" : "C=CASH  D=CARD  S=STORE CREDIT")
+			: "C=CASH  D=CARD  K=CHECK  G=GIFT CARD  S=STORE CREDIT", { color: "blue" });
 		label(scr, f + 1, 2, "AMOUNT ===>");
-		scr.input(f + 1, 14, 9, "amount", dollars(due), { bright: s.errField === "amount" });
+		scr.input(f + 1, 14, 9, "amount", dollars(Math.abs(due)), { bright: s.errField === "amount" });
 		label(scr, f + 2, 2, "REF    ===>");
-		scr.input(f + 2, 14, 8, "ref", "", { bright: s.errField === "ref" });
-		scr.text(f + 2, 24, "CARD: LAST 4 DIGITS  CHECK: CHECK NUMBER", { color: "blue" });
+		scr.input(f + 2, 14, 19, "ref", "", { bright: s.errField === "ref" });
+		scr.text(f + 2, 35, refund ? "CARD: LAST 4  CREDIT: BLANK FOR NEW" : "CARD: LAST 4  CHECK NO.  GIFT/CREDIT NO.", { color: "blue" });
 		label(scr, f + 3, 2, "AUTH   ===>");
 		scr.input(f + 3, 14, 10, "auth", "", { bright: s.errField === "auth" });
 		scr.text(f + 3, 26, "CARD: THE APPROVAL CODE FROM THE CARD TERMINAL", { color: "blue" });
@@ -269,34 +289,76 @@ export const tender = onLane(panel<TenderState, Env>({
 		};
 		const priced = await priceSale(ctx, sale);
 		const due = priced.total - paid(sale.tenders);
+		// An even exchange: nothing to pay or refund.
+		if (due === 0) return complete(ctx, s, priced, 0, false);
+		const refund = due < 0;
+		const owed = Math.abs(due);
 		const kind = KINDS[(inp.fields.method ?? "").trim().toUpperCase()];
-		if (!kind) return fail("method", "2304E METHOD MUST BE C (CASH), D (CARD) OR K (CHECK)");
+		if (!kind) return fail("method", "2304E METHOD MUST BE C, D, K, G OR S");
+		if (refund && (kind === "CHECK" || kind === "GIFT")) return fail("method", "2313E REFUND AS C (CASH), D (CARD) OR S (STORE CREDIT)");
+		if (refund && kind !== "CREDIT" && noReceipt(sale)) return fail("method", "2314E AN ITEM CAME BACK WITHOUT A RECEIPT - REFUND AS S (STORE CREDIT)");
 		const amtTyped = (inp.fields.amount ?? "").trim();
-		const amount = amtTyped ? cents(amtTyped) : due;
-		if (!amount) return fail("amount", "2305E KEY THE AMOUNT, E.G. 20.00");
-		if (kind !== "CASH" && amount > due) return fail("amount", `2306E A ${kind} CAN PAY AT MOST THE ${dollars(due)} DUE`);
-		const ref = (inp.fields.ref ?? "").trim();
+		const amount = amtTyped ? cents(amtTyped) : owed;
+		if (!amount || amount < 0) return fail("amount", "2305E KEY THE AMOUNT, E.G. 20.00");
+		if ((refund || kind !== "CASH") && amount > owed) {
+			return fail("amount", refund ? `2315E THE REFUND IS AT MOST ${dollars(owed)}` : `2306E A ${kind} CAN PAY AT MOST THE ${dollars(owed)} DUE`);
+		}
+		const ref = (inp.fields.ref ?? "").trim().toUpperCase();
 		const auth = (inp.fields.auth ?? "").trim().toUpperCase();
 		if (kind === "CARD" && !/^\d{4}$/.test(ref)) return fail("ref", "2307E KEY THE CARD'S LAST 4 DIGITS");
 		if (kind === "CARD" && !/^[A-Z0-9]{2,10}$/.test(auth)) return fail("auth", "2308E KEY THE APPROVAL CODE FROM THE CARD TERMINAL");
 		if (kind === "CHECK" && !/^\d{1,8}$/.test(ref)) return fail("ref", "2309E KEY THE CHECK NUMBER");
 		if (sale.tenders.length >= 8) return fail("method", "2310E A SALE TAKES AT MOST 8 TENDERS");
-		const x: Tender = { kind, amount: Math.min(amount, due), tendered: amount, ...(kind !== "CASH" ? { ref } : {}), ...(kind === "CARD" ? { auth } : {}) };
+		let number = ref;
+		if (kind === "GIFT" || kind === "CREDIT") {
+			if (refund && kind === "CREDIT" && !ref) number = newCreditNumber();
+			else {
+				number = kind === "GIFT" ? giftNumber(ref) : /^SC\d{12}$/.test(ref) ? ref : "";
+				if (!number) return fail("ref", kind === "GIFT" ? "2316E SCAN THE GIFT CARD, OR KEY ITS 8 TO 19 DIGITS" : "2317E KEY THE STORE CREDIT NUMBER, SC AND 12 DIGITS");
+				const card = await getCard(ctx.env.DB, number);
+				if (!card || card.kind !== kind || card.status !== "A") {
+					return fail("ref", `2318E ${number} ISN'T ${kind === "GIFT" ? "A GIFT CARD" : "STORE CREDIT"} IN USE`);
+				}
+				if (!refund) {
+					// What the card holds, less what it already pays on this sale.
+					const left = card.balance - sale.tenders.filter((x) => x.ref === number).reduce((t, x) => t + x.amount, 0);
+					if (left <= 0) return fail("ref", `2319E ${number} HOLDS NOTHING`);
+					if (amount > left) return fail("amount", `2320E ${number} HOLDS ONLY ${dollars(left)}`);
+				}
+			}
+		}
+		const sign = refund ? -1 : 1;
+		const applied = refund ? amount : Math.min(amount, owed);
+		const x: Tender = {
+			kind, amount: sign * applied, tendered: sign * (refund ? applied : amount),
+			...(kind !== "CASH" ? { ref: number } : {}), ...(kind === "CARD" ? { auth } : {}),
+		};
 		sale.tenders.push(x);
-		if (x.amount < due) {
-			s.msg = `${msgId(ctx, "2311I")} ${kind} ${dollars(x.amount)} APPLIED - ${dollars(due - x.amount)} STILL DUE`;
+		if (applied < owed) {
+			s.msg = `${msgId(ctx, "2311I")} ${x.kind} ${dollars(applied)} ${refund ? "REFUNDED" : "APPLIED"} - ${dollars(owed - applied)} STILL ${refund ? "TO REFUND" : "DUE"}`;
 			return s;
 		}
-		try {
-			const id = await writeSale(ctx.env.DB, sale.lane, sale.token, sale.lines, sale.tenders, priced, "C");
-			const change = amount - x.amount;
-			return {
-				p: "receipt", lane: sale.lane, sale: id, change, back: newSale(sale.lane),
-				msg: `${msgId(ctx, "2312I")} SALE ${id} COMPLETE${change > 0 ? ` - CHANGE DUE ${dollars(change)}` : ""}`,
-			} satisfies ReceiptState;
-		} catch (e) {
-			sale.tenders.pop();
-			return drawerGone(ctx, sale, e);
-		}
+		return complete(ctx, s, priced, amount - applied, true);
 	},
 }));
+
+// complete writes the paid sale and shows its receipt. If it can't be
+// written, the tender just added comes off again.
+async function complete(ctx: PosCtx, s: TenderState, priced: Priced, change: number, added: boolean) {
+	const sale = s.back;
+	try {
+		const id = await writeSale(ctx.env.DB, sale.lane, sale.token, sale.lines, sale.tenders, priced, "C", sale.customer?.id);
+		return {
+			p: "receipt", lane: sale.lane, sale: id, change, back: newSale(sale.lane),
+			msg: `${msgId(ctx, "2312I")} SALE ${id} COMPLETE${change > 0 ? ` - CHANGE DUE ${dollars(change)}` : ""}`,
+		} satisfies ReceiptState;
+	} catch (e) {
+		const x = added ? sale.tenders.pop() : undefined;
+		if (e instanceof Invalid) {
+			s.msg = `${msgId(ctx, "2300E")} ${e.message}`;
+			if (x && (x.kind === "GIFT" || x.kind === "CREDIT")) s.errField = "ref";
+			return s;
+		}
+		return drawerGone(ctx, sale, e);
+	}
+}
