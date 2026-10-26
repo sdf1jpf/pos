@@ -6,6 +6,7 @@ import { accessAuth, createApp, helpTable, msgId, time, userIdFor, values } from
 import { tso } from "@greenscreen-dev/worker/sessions";
 import { who } from "./access";
 import { listDepartments } from "./data/items";
+import { reasons, type Kind } from "./data/reasons";
 import { registerForToken } from "./data/register";
 import type { Env } from "./env";
 import { signOn } from "./register/common";
@@ -98,7 +99,6 @@ const app = createApp<Env>({
 		"promotion.items": { title: "ITEMS", lines: ["The SKUs on promotion, separated by commas. A line takes at most", "one promotion, and none once its price is overridden or discounted."] },
 		"coupon.value": { title: "VALUE", lines: ["A percent off (10%) or an amount off (2.00), from the item, the", "department's items, or the whole sale."] },
 		"discount.disc": { title: "DISCOUNT", lines: ["A percent (10%) or an amount (2.00) off the line, or a percent off", "the whole sale with LINE blank. 0 takes a discount off. Over the", "store's limit, a supervisor or manager approves it."] },
-		"discount.reason": { title: "REASON", lines: ["Why the price is overridden."], values: values(["PM", "PRICE MATCH"], ["AD", "AD PRICE"], ["MK", "MISMARKED"], ["DM", "DAMAGED"], ["MG", "MANAGER'S CALL"]) },
 		"employee.pin": { title: "REGISTER PIN", lines: ["Four digits the person keys with their operator ID to sign on at a", "register or approve an override. Setting one unlocks someone locked", "out after three wrong PINs. Blank leaves the PIN as it is."] },
 		"lane.store": { title: "STORE", lines: ["The store whose register to run on this terminal."] },
 		"lane.reg": { title: "REGISTER", lines: ["The register to run. Its sales go in its own drawer."] },
@@ -130,7 +130,9 @@ const app = createApp<Env>({
 		"gift.card": { title: "CARD NUMBER", lines: ["Scan the gift card, or key its 8 to 19 digits."] },
 		"gift.amount": { title: "AMOUNT", lines: ["What goes on the card: 5.00 to 500.00."] },
 		"receipts.sel": { title: "SELECTION CODE", lines: ["S shows a receipt to reprint. V voids a paid sale; a supervisor or", "manager approves it with their PIN."], values: values(["S", "SHOW/REPRINT"], ["V", "VOID"]) },
-		"adjust.reason": { title: "REASON", lines: ["Why on hand is changed."], values: values(["DM", "DAMAGED"], ["SH", "SHRINK"], ["FD", "FOUND"], ["US", "STORE USE"], ["OT", "OTHER"]) },
+		"adjust.reason": { title: "REASON", lines: ["Why on hand is changed. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "ADJUST") },
+		"discount.reason": { title: "REASON", lines: ["Why the price is overridden. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "OVERRIDE") },
+		"card.reason": { title: "REASON", lines: ["Why the balance is changed. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "CARD") },
 		"adjust.qty": { title: "CHANGE", lines: ["How many more there are (5) or fewer (-5). Pounds for a weighed", "item, e.g. -1.25."] },
 		"stock.sel": { title: "SELECTION CODE", lines: ["L shows the item's ledger; A adjusts its on hand."], values: values(["L", "LEDGER"], ["A", "ADJUST"]) },
 		"counts.dept": { title: "DEPARTMENT", lines: ["PF5 starts a cycle count of this department's items. Blank counts", "every item."], values: async (ctx) => deptValues(ctx.env.DB) },
@@ -142,6 +144,10 @@ const app = createApp<Env>({
 	// Sessions and record locks: a register runs on one terminal at a time.
 	sessions: (env) => (env.SESSIONS ? tso(env.SESSIONS) : undefined),
 });
+
+async function reasonValues(db: D1Database, kind: Kind) {
+	return Object.entries(await reasons(db, kind)).map(([code, desc]) => ({ code, desc }));
+}
 
 async function deptValues(db: D1Database) {
 	return (await listDepartments(db)).filter((d) => d.status === "A").map((d) => ({ code: String(d.dept), desc: d.name }));
