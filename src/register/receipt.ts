@@ -1,7 +1,6 @@
-import { clock, invalidKey, keys, label, lpad, message, msgId, pad, panel, pf, withFill } from "@greenscreen-dev/worker";
-import { Invalid } from "../data/db";
-import { approves, checkPin } from "../data/pins";
-import { getSale, listSales, postVoid, type Sale } from "../data/register";
+import { clock, invalidKey, keys, lpad, message, msgId, pad, panel, pf } from "@greenscreen-dev/worker";
+import { lineAdj, wholeAdj } from "../data/pricing";
+import { getSale, listSales, type Sale } from "../data/register";
 import { getStore, type Store } from "../data/stores";
 import type { Env } from "../env";
 import { dollars, rate } from "../money";
@@ -25,12 +24,18 @@ export function receipt(ctx: PosCtx, st: Store, s: Sale, taxRate: number): strin
 	out.push(center(st.addr1), center([st.city, st.state, st.zip].filter(Boolean).join(" ")));
 	if (st.phone) out.push(center(st.phone));
 	out.push("", both(`STORE ${s.store} REG ${two(s.reg)} OPER ${s.operator}`, clock(ctx, s.at)), both("RECEIPT", receiptNo(s)), "-".repeat(WIDTH));
-	for (const l of s.lines) {
+	s.lines.forEach((l, i) => {
 		out.push(both(pad(l.desc, 30), `${dollars(l.amount)}${l.taxable ? "T" : " "}`));
 		if (l.qty !== 1000 || l.weighed) out.push(`  ${showQty(l.qty, l.weighed)} @ ${dollars(l.price)}${l.weighed ? "/LB" : ""}`);
+		if (l.override) out.push(pad(`  PRICE OVERRIDE, WAS ${dollars(l.override.from)} ${l.override.reason}`, WIDTH));
 		if (l.void) out.push(both("  LINE VOIDED", `${dollars(-l.amount)} `));
-	}
-	out.push("-".repeat(WIDTH), both("SUBTOTAL", `${dollars(s.subtotal)} `), both(`TAX ${rate(taxRate)}%`, `${dollars(s.tax)} `), both("TOTAL", `${dollars(s.total)} `), "");
+		for (const a of lineAdj(s.adjustments, i + 1)) out.push(both(pad(`  ${a.desc}${a.kind === "LINEDISC" && a.code ? ` ${a.code}` : ""}`, 30), `${dollars(-a.amount)} `));
+	});
+	out.push("-".repeat(WIDTH), both("SUBTOTAL", `${dollars(s.subtotal)} `));
+	for (const a of wholeAdj(s.adjustments)) out.push(both(pad(a.kind === "COUPON" ? `COUPON ${a.code}` : `${a.desc} ${a.code}`, 30), `${dollars(-a.amount)} `));
+	out.push(both(`TAX ${rate(taxRate)}%`, `${dollars(s.tax)} `), both("TOTAL", `${dollars(s.total)} `));
+	if (s.discount > 0) out.push(center(`YOU SAVED ${dollars(s.discount)}`));
+	out.push("");
 	for (const t of s.tenders) {
 		const what = t.kind === "CARD" ? `CARD ****${t.ref} AUTH ${t.auth}` : t.kind === "CHECK" ? `CHECK #${t.ref}` : "CASH";
 		out.push(both(what, `${dollars(t.tendered)} `));
@@ -136,54 +141,5 @@ export const receipts = onLane(panel<ReceiptsState, Env>({
 			return s;
 		}
 		return s;
-	},
-}));
-
-// POS290 MANAGER APPROVAL: a supervisor, manager or administrator keys
-// their operator ID and PIN to approve what the operator can't do alone.
-
-export const approve = onLane(panel<ApproveState, Env>({
-	async render(ctx, s) {
-		const scr = laneScreen(ctx, "POS290", "MANAGER APPROVAL", s.lane);
-		const sale = await getSale(ctx.env.DB, s.sale);
-		scr.text(5, 2, "APPROVAL IS NEEDED TO:", { color: "white", bright: true });
-		scr.text(6, 4, `VOID SALE ${sale ? receiptNo(sale) : s.sale}, ${dollars(sale?.total ?? 0)}, PAID ${sale ? clock(ctx, sale.at) : ""}`, { color: "yellow", bright: true });
-		label(scr, 9, 2, "MANAGER OPERATOR ===>");
-		scr.input(9, 24, 6, "operator", "", { numeric: true, bright: s.errField === "operator" });
-		label(scr, 10, 2, "PIN              ===>");
-		scr.input(10, 24, 4, "pin", "", { numeric: true, hidden: true, bright: s.errField === "pin" });
-		message(scr, s.msg ?? "");
-		keys(scr, "PF3=CANCEL  ENTER=APPROVE");
-		scr.cursorTo(s.errField ?? "operator");
-		return scr;
-	},
-	async handle(ctx, s, inp) {
-		s.msg = s.errField = undefined;
-		if (inp.aid === pf(3) || inp.aid === pf(12)) return s.back;
-		if (inp.aid !== "ENTER") {
-			s.msg = invalidKey(ctx, inp.aid);
-			return s;
-		}
-		const operator = (inp.fields.operator ?? "").trim();
-		const fail = (field: string, msg: string) => {
-			s.msg = msgId(ctx, msg);
-			s.errField = field;
-			return withFill(s, { fields: { operator }, cursor: field });
-		};
-		if (!operator) return fail("operator", "2901E KEY THE MANAGER'S OPERATOR ID");
-		const got = await checkPin(ctx.env.DB, s.lane.store, operator, (inp.fields.pin ?? "").trim(), s.lane.reg);
-		if (!got.ok) {
-			return got.why === "locked" ? fail("operator", `2902E OPERATOR ${operator} IS LOCKED OUT`)
-				: got.why === "store" ? fail("operator", `2903E OPERATOR ${operator} MAY NOT APPROVE IN STORE ${s.lane.store}`)
-				: fail("pin", `2904E OPERATOR ID OR PIN IS WRONG${got.left ? ` - ${got.left} ${got.left === 1 ? "TRY" : "TRIES"} LEFT` : ""}`);
-		}
-		if (!approves(got.op.role)) return fail("operator", `2905E ${got.op.name} MAY NOT APPROVE THIS - A SUPERVISOR OR MANAGER MUST`);
-		try {
-			await postVoid(ctx.env.DB, s.lane, s.sale, { emp: got.op.emp, op: got.op.operator });
-		} catch (e) {
-			if (!(e instanceof Invalid)) throw e;
-			return { ...s.back, msg: `${msgId(ctx, "2906E")} ${e.message}` };
-		}
-		return { ...s.back, msg: `${msgId(ctx, "2907I")} SALE ${s.sale} VOIDED - APPROVED BY ${got.op.name}` };
 	},
 }));
