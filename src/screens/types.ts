@@ -31,3 +31,11 @@ export interface CountsState extends ListState { p: "counts"; store?: number; er
 export interface CountState extends ListState { p: "count"; id: number }
 export interface TransfersState extends ListState { p: "transfers" }
 export interface TransferState extends PanelState { p: "transfer"; back: PanelState; id?: number; errField?: string } // no id: starting one
+export interface VendorsState extends ListState { p: "vendors" }
+export interface VendorState extends PanelState { p: "vendor"; back: PanelState; code?: string; version?: number; errField?: string } // no code: adding
+export interface PosState extends ListState { p: "pos"; all?: boolean }
+// token names the next delivery received, so Enter pressed twice receives once.
+export interface PoState extends PanelState { p: "po"; back: PanelState; id?: number; token: string; errField?: string } // no id: starting one
+export interface SuggestState extends PanelState { p: "suggested"; back: PanelState; store?: number; vendor?: string; keys?: string[]; errField?: string }
+export interface ReorderState extends ListState { p: "reorder"; store?: number; vendor?: string; errField?: string }
+export interface VendorReturnState extends PanelState { p: "vreturn"; back: PanelState; token: string; errField?: string }

@@ -24,6 +24,12 @@ INSERT INTO items (sku, upc, descr, dept, class, vendor, cost, price, taxable, w
 	('300100', '098765432109', 'MUG, STONEWARE 12 OZ', 30, 'KIT', 'HOMEGDS', 210, 599, 1, 0, '2026-10-26T00:00:00Z', 'SEED'),
 	('400100', '076543210987', 'HAMMER, CLAW 16 OZ', 40, 'TLS', 'TOOLCO', 845, 1999, 1, 0, '2026-10-26T00:00:00Z', 'SEED');
 
+INSERT INTO vendors (code, name, phone, terms, lead_days, updated_at, updated_by) VALUES
+	('ACMEFOOD', 'ACME FOOD DISTRIBUTORS', '800-555-0110', 'NET 30', 7, '2026-10-26T00:00:00Z', 'SEED'),
+	('VALLEYFM', 'VALLEY FARMS', '937-555-0120', 'NET 10', 2, '2026-10-26T00:00:00Z', 'SEED'),
+	('HOMEGDS', 'HOME GOODS SUPPLY', '800-555-0130', 'NET 30', 10, '2026-10-26T00:00:00Z', 'SEED'),
+	('TOOLCO', 'TOOL COMPANY', '800-555-0140', 'NET 45', 14, '2026-10-26T00:00:00Z', 'SEED');
+
 INSERT INTO prices (store, sku, price, updated_at, updated_by) VALUES
 	(2, '100100', 849, '2026-10-26T00:00:00Z', 'SEED');
 
