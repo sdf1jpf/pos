@@ -204,6 +204,40 @@ export async function findItem(db: D1Database, store: number, code: string): Pro
 	return { sku: r.sku, desc: r.desc, dept: r.dept, price, taxable: r.taxable === 1, weighed: r.weighed === 1 };
 }
 
+export interface Found {
+	sku: string;
+	desc: string;
+	price: number; // the store's, cents
+	weighed: boolean;
+	onHand: number; // at the store, thousandths
+}
+
+// lookupItems finds the items on sale that match what a clerk typed: the
+// UPC, the start of the SKU, or every word somewhere in the description.
+// Each comes with the store's price and on hand, by description.
+export async function lookupItems(
+	db: D1Database, store: number, q: string, offset: number, limit: number,
+): Promise<{ items: Found[]; total: number }> {
+	const t = q.trim().toUpperCase().slice(0, 30);
+	const like = (s: string) => s.replace(/[\\%_]/g, (c) => "\\" + c);
+	const words = t.split(/\s+/).filter(Boolean);
+	const where = ["i.status = 'A'"];
+	const args: unknown[] = [];
+	if (words.length) {
+		where.push(`(i.sku LIKE ? ESCAPE '\\' OR i.upc = ? OR (${words.map(() => "i.descr LIKE ? ESCAPE '\\'").join(" AND ")}))`);
+		args.push(like(t) + "%", t, ...words.map((w) => "%" + like(w) + "%"));
+	}
+	const from = `FROM items i LEFT JOIN prices p ON p.store = ? AND p.sku = i.sku
+		LEFT JOIN stock st ON st.store = ? AND st.sku = i.sku WHERE ${where.join(" AND ")}`;
+	const [rows, count] = await db.batch<Record<string, unknown>>([
+		db.prepare(`SELECT i.sku, i.descr AS desc, COALESCE(p.price, i.price) AS price, i.weighed, COALESCE(st.on_hand, 0) AS onHand
+			${from} ORDER BY i.descr, i.sku LIMIT ? OFFSET ?`).bind(store, store, ...args, limit, offset),
+		db.prepare(`SELECT COUNT(*) AS n ${from}`).bind(store, store, ...args),
+	]);
+	const items = (rows.results as (Omit<Found, "weighed"> & { weighed: number })[]).map((r) => ({ ...r, weighed: r.weighed === 1 }));
+	return { items, total: (count.results[0] as { n: number }).n };
+}
+
 // Sales
 
 export interface Line {

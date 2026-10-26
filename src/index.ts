@@ -15,6 +15,7 @@ import { signOn } from "./register/common";
 import { closedrawer, functions, paid } from "./register/drawer";
 import { approve, discount } from "./register/discount";
 import { customer, gift, resumePanel } from "./register/extras";
+import { lookup } from "./register/lookup";
 import { receiptPanel, receipts } from "./register/receipt";
 import { returnPanel } from "./register/returns";
 import { card, sale, tender } from "./register/sale";
@@ -60,7 +61,7 @@ const app = createApp<Env>({
 		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport, timecards, timecard, schedule,
 		customers, custfile: customerScreen, giftcard, audit, auditrow: auditRow, reasons: reasonCodes, reports, report,
 		lane: laneSelect, clerklane: clerkLane, signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
-		return: returnPanel, customer, gift, resume: resumePanel,
+		return: returnPanel, customer, gift, resume: resumePanel, lookup,
 	},
 	auth,
 	// A register enrolled with its service token goes to its sign-on screen.
@@ -130,7 +131,9 @@ const app = createApp<Env>({
 		"timecard.reason": { title: "REASON", lines: ["Why the punches are being changed. It is kept with each punch", "changed and in the audit log."] },
 		"schedule.week": { title: "WEEK OF", lines: ["Any day of the week to schedule, YYYY-MM-DD. Weeks run Monday to Sunday."] },
 		"schedule.sh": { title: "SHIFT", lines: ["Start and end, local time: 0900-1700, 9-17 or 9:30-17:30.", "A shift that ends before it starts ends the next day. Blank is a day off."] },
-		"sale.item": { title: "ITEM", lines: ["Scan the barcode, or key the SKU or UPC, and press Enter. A scan", "rings one. PF2 shows the price without ringing it."] },
+		"sale.item": { title: "ITEM", lines: ["Scan the barcode, or key the SKU or UPC, and press Enter. A scan", "rings one. PF2 shows the price without ringing it. PF11 looks an", "item up by a word in its description; key the word here first."] },
+		"lookup.q": { title: "SEARCH", lines: ["A word from the description (or several: an item must have them all),", "the start of a SKU, or a UPC. Blank lists every item on sale."] },
+		"lookup.sel": { title: "SELECTION CODE", lines: ["Type S beside an item and press Enter to ring one of it. An item sold", "by weight goes back to the sale for the pounds."], values: values(["S", "RING ONE"]) },
 		"sale.qty": { title: "QTY", lines: ["How many, 1 to 999; it starts at 1. For an item sold by weight, the", "pounds from the scale, e.g. 1.25. Key a new qty and press PF10 to", "change the last line (or the line in LINE) instead."] },
 		"sale.line": { title: "LINE", lines: ["The line number to void with PF6, or to change the qty of with PF10.", "Blank is the last line."] },
 		"tender.method": { title: "METHOD", lines: ["How the customer pays this part."], values: values(["C", "CASH"], ["D", "CARD, ON THE CARD TERMINAL"], ["K", "CHECK"], ["G", "GIFT CARD"], ["S", "STORE CREDIT"]) },
