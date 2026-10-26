@@ -2,11 +2,12 @@
 // Cloudflare Workers and D1. Every screen is a panel in src/screens; the
 // data they keep is in src/data; @greenscreen-dev/worker does the rest.
 
-import { accessAuth, createApp, helpTable, msgId, time, userIdFor, values } from "@greenscreen-dev/worker";
+import { accessAuth, createApp, helpTable, msgId, time, user, userIdFor, values } from "@greenscreen-dev/worker";
 import { tso } from "@greenscreen-dev/worker/sessions";
 import { who } from "./access";
 import { listDepartments } from "./data/items";
 import { reasons, type Kind } from "./data/reasons";
+import { REPORTS } from "./data/reports";
 import { registerForToken } from "./data/register";
 import type { Env } from "./env";
 import { signOn } from "./register/common";
@@ -26,6 +27,7 @@ import { adjustStock, count, counts, stock, stockLedger, transfer, transfers } f
 import { item, items } from "./screens/items";
 import { menu } from "./screens/menu";
 import { prices } from "./screens/prices";
+import { report, reportPdf, reports } from "./screens/reports";
 import { po, pos, reorder, suggested, vendor, vendorReturn, vendors } from "./screens/purchasing";
 import { coupon, coupons, promotion, promotions } from "./screens/promos";
 import { registers, store, stores } from "./screens/stores";
@@ -46,7 +48,7 @@ const app = createApp<Env>({
 		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
 		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport, timecards, timecard, schedule,
-		customers, custfile: customerScreen, giftcard, audit, auditrow: auditRow, reasons: reasonCodes,
+		customers, custfile: customerScreen, giftcard, audit, auditrow: auditRow, reasons: reasonCodes, reports, report,
 		lane: laneSelect, signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},
@@ -111,6 +113,8 @@ const app = createApp<Env>({
 		"giftcard.amount": { title: "ADJUST", lines: ["An amount to add to the balance, e.g. 5.00, or to take off,", "e.g. -5.00. Needs a reason code."] },
 		"audit.action": { title: "ACTION", lines: ["The start of the action: TIME shows every time clock entry,", "SALE.VOID only post-voids. Blank shows everything."] },
 		"audit.before": { title: "ON OR BEFORE", lines: ["Show what happened on or before this day, YYYY-MM-DD.", "Blank is up to now."] },
+		"reports.report": { title: "REPORT", lines: ["The report to show."], values: values(...Object.entries(REPORTS)) },
+		"reports.from": { title: "FROM", lines: ["The first business day to report on, YYYY-MM-DD. A day's sales are", "those rung in drawers opened on it, as on its Z report."] },
 		"reasons.kind": { title: "KIND", lines: ["Which reasons to keep."], values: values(["ADJUST", "STOCK ADJUSTMENTS"], ["OVERRIDE", "PRICE OVERRIDES"], ["CARD", "GIFT CARD CHANGES"]) },
 		"timecards.week": { title: "WEEK OF", lines: ["Any day of the week to show, YYYY-MM-DD. Weeks run Monday to Sunday."] },
 		"timecard.reason": { title: "REASON", lines: ["Why the punches are being changed. It is kept with each punch", "changed and in the audit log."] },
@@ -144,6 +148,9 @@ const app = createApp<Env>({
 	// Sessions and record locks: a register runs on one terminal at a time.
 	sessions: (env) => (env.SESSIONS ? tso(env.SESSIONS) : undefined),
 });
+
+// A report printed to PDF (PF10 on a report), for the signed-on user.
+app.get("/v1/report.pdf", app.signedOn, (c) => reportPdf(c.env, user(c), new URL(c.req.url)));
 
 async function reasonValues(db: D1Database, kind: Kind) {
 	return Object.entries(await reasons(db, kind)).map(([code, desc]) => ({ code, desc }));

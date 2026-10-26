@@ -40,6 +40,8 @@ export async function postSale(db: D1Database, id: number): Promise<void> {
 	const sold = "s.status IN ('C', 'V') AND s.posted = 0";
 	const voided = "s.status = 'V' AND s.posted = 1";
 	await db.batch([
+		// The cost of what sold, as it is now, for margin reports.
+		db.prepare("UPDATE sale_lines SET cost = (SELECT cost FROM items WHERE sku = sale_lines.sku) WHERE sale = ? AND cost IS NULL").bind(id),
 		db.prepare(`INSERT INTO stock_moves (store, sku, at, kind, qty, ref, line, userid)
 			SELECT s.store, l.sku, ?, 'SALE', -l.qty, CAST(s.id AS TEXT), l.line, 'POSTING' ${lines(sold)}`).bind(at, id),
 		db.prepare(`INSERT INTO stock (store, sku, on_hand, updated_at)

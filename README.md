@@ -55,6 +55,8 @@ orders, reorder points and returns to vendors).
 | POS420 | 4.2 TIME CARDS: a store's week, hours by day, worked against scheduled | managers (their stores), admins |
 | POS421 | Time card: one person's punches; change times in place, D deletes, the last line adds one, each with a reason | same |
 | POS430 | 4.3 SCHEDULE: a store's week of shifts; PF6 copies last week into the days left blank | same |
+| POS610 | 6 REPORTS: sales by day, hour, department, item and cashier (with margin), tenders, exceptions; inventory value and low stock | buyers, managers (their stores), admins |
+| POS611 | A report on the screen; PF10 prints it as a PDF on green-bar paper | same |
 | POSM07 | 7 CUSTOMERS | managers, admins |
 | POS710 | 7.1 CUSTOMERS: found by name or part of the phone number; PF5 adds one | same |
 | POS711 | Customer: name, phone, email, tax exemption, status; their cards and last sales | same |
@@ -68,8 +70,7 @@ orders, reorder points and returns to vendors).
 | POS840 | 8.4 REASON CODES: stock adjustment, price override and gift card reasons; changed in place, never deleted | admins |
 | POS200 | R REGISTER: run a register on this terminal | supervisors, managers, admins |
 
-Menu numbers follow the plan (6 REPORTS comes later), so fast paths
-like `=1.3` won't move. Inventory's maps are POS31x to POS33x,
+Menu numbers follow the plan, so fast paths like `=1.3` won't move. Inventory's maps are POS31x to POS33x,
 purchasing's POS36x to POS38x, time cards and the schedule POS42x to
 POS43x, end of day's POS51x to POS52x and customers' POS71x to POS72x,
 since the register has POS2xx.
@@ -80,6 +81,10 @@ Rules worth knowing:
   ID and PIN clocks that person in, or out if they are on the clock.
   Managers fix punches on the time card; every change needs a reason and
   is audited.
+- **Reports.** Sales count by business day, as the Z report does, and
+  completed sales only. Margin uses each line's cost when its sale was
+  posted to the stock ledger. PF10 prints a report as a PDF from
+  `GET /v1/report.pdf`, which checks the reader's rights and stores again.
 - **Business day.** Each store has one. A drawer belongs to the day it
   opened on, and its sales with it. Closing a day runs as a Workflow
   (`greenscreen-pos-close-day`) and is refused while any drawer is open;
@@ -178,6 +183,7 @@ src/access.ts        who is signed on, their role and stores
 src/worker.ts        the Worker's entry: the app, the posting queue and cron, the Sessions Durable Object
 src/posting.ts       posting paid sales to the stock ledger
 src/closeday.ts      the Workflow that closes a store's day
+src/pdf.ts           reports as PDFs, written by hand (Courier, nothing embedded)
 src/data/*.ts        stores, items, employees, PINs, the register: SQL, validation, audit
 src/screens/*.ts     the back-office panels, one module per group
 src/register/*.ts    the register panels
