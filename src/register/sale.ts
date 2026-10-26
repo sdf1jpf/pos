@@ -52,7 +52,9 @@ function rows(s: SaleState, p: Priced): Row[] {
 }
 
 // POS220 SALE: items keyed or scanned, one line each, with the running
-// total. Enter rings the item; PF5 takes payment.
+// total. Enter rings the item; PF5 takes payment. QTY shows 1 and is left
+// alone by a scan, so a scanner that sends the UPC and Enter rings one
+// with no other key. PF10 changes the quantity of the last line.
 
 export const sale = onLane(panel<SaleState, Env>({
 	async render(ctx, s) {
@@ -60,13 +62,13 @@ export const sale = onLane(panel<SaleState, Env>({
 		label(scr, 4, 2, "ITEM ===>");
 		scr.input(4, 12, 14, "item", "", { bright: s.errField === "item" });
 		label(scr, 4, 28, "QTY ===>");
-		scr.input(4, 37, 8, "qty", "", { bright: s.errField === "qty" });
+		scr.input(4, 37, 8, "qty", "1", { bright: s.errField === "qty" });
 		label(scr, 4, 47, "LINE ===>");
 		scr.input(4, 57, 2, "line", "", { numeric: true, bright: s.errField === "line" });
 		if (s.customer) {
 			scr.text(5, 2, `CUSTOMER ${s.customer.name} ${showPhone(s.customer.phone)}${s.customer.exempt ? "  TAX EXEMPT" : ""}`, { color: "turquoise" });
 		} else {
-			scr.text(5, 2, "SCAN OR KEY A SKU OR UPC; QTY IS POUNDS FOR A WEIGHED ITEM. LINE IS FOR PF6.", { color: "blue" });
+			scr.text(5, 2, "SCAN OR KEY A SKU OR UPC. QTY IS POUNDS FOR A WEIGHED ITEM. LINE IS FOR PF6/PF10.", { color: "blue" });
 		}
 		scr.text(6, 2, "LN SKU            DESCRIPTION                        QTY     PRICE    AMOUNT T", { color: "white", bright: true });
 		scr.text(7, 2, "-".repeat(scr.cols - 3), { color: "blue" });
@@ -95,7 +97,7 @@ export const sale = onLane(panel<SaleState, Env>({
 		const p = paid(s.tenders);
 		if (p > 0) scr.text(scr.rows - 2, 34, `PAID ${lpad(dollars(p), 9)}   BALANCE DUE ${lpad(dollars(t.total - p), 9)}`, { color: "yellow", bright: true });
 		message(scr, s.msg ?? "");
-		keys(scr, "PF2=PRICE PF3=SIGNOFF PF4=FUNC PF5=TENDER PF6=VOID LN PF9=DISCOUNT PF12=VOID");
+		keys(scr, "PF2=PRICE PF3=SIGNOFF PF4=FUNC PF5=TENDER PF6=VOID LN PF9=DISC PF10=QTY PF12=VOID");
 		scr.cursorTo(s.errField ?? "item");
 		return scr;
 	},
@@ -103,10 +105,14 @@ export const sale = onLane(panel<SaleState, Env>({
 	async handle(ctx, s, inp) {
 		const voiding = s.voiding;
 		s.msg = s.errField = s.voiding = undefined;
-		const fail = (field: string, msg: string) => {
+		// Only what was typed is kept on an error: QTY's 1 is shown fresh, so
+		// it can't become 1 pound of the next item scanned.
+		const typed = (n: string) => (inp.modified.has(n) ? (inp.fields[n] ?? "") : "");
+		const fail = (field: string, msg: string, keep: Record<string, string> = {}) => {
 			s.msg = msgId(ctx, msg);
 			s.errField = field;
-			return withFill(s, { fields: inp.fields, cursor: field });
+			const fields = Object.fromEntries([...inp.modified].filter((n) => n in inp.fields).map((n) => [n, inp.fields[n]]));
+			return withFill(s, { fields: { ...fields, ...keep }, cursor: field });
 		};
 		const live = s.lines.filter((l) => !l.void);
 		const code = (inp.fields.item ?? "").trim().toUpperCase();
@@ -127,9 +133,11 @@ export const sale = onLane(panel<SaleState, Env>({
 					return s;
 				}
 				if (it.price <= 0) return fail("item", `2206E ITEM ${it.sku} HAS NO PRICE - SEE A MANAGER`);
-				const qty = readQty(inp.fields.qty ?? "", it.weighed);
+				// The 1 QTY shows is a count, never pounds: a weighed item needs them keyed.
+				const qty = readQty(it.weighed ? typed("qty") : (inp.fields.qty ?? ""), it.weighed);
 				if (qty === undefined) {
-					return fail("qty", it.weighed ? `2207E ${it.desc} IS SOLD BY WEIGHT - KEY THE POUNDS, E.G. 1.25` : "2208E QTY MUST BE 1 TO 999");
+					return it.weighed ? fail("qty", `2207E ${it.desc} IS SOLD BY WEIGHT - KEY THE POUNDS, E.G. 1.25`, { item: code, qty: "" })
+						: fail("qty", "2208E QTY MUST BE 1 TO 999", { item: code });
 				}
 				if (s.lines.length >= MAX_LINES) return fail("item", `2209E A SALE HOLDS AT MOST ${MAX_LINES} LINES - TENDER THIS ONE`);
 				const line: Line = { sku: it.sku, desc: it.desc, dept: it.dept, qty, price: it.price, amount: lineAmount(qty, it.price), taxable: it.taxable, weighed: it.weighed };
@@ -146,6 +154,22 @@ export const sale = onLane(panel<SaleState, Env>({
 				if (l.void) return fail("line", `2214E LINE ${n} IS ALREADY VOID`);
 				l.void = true;
 				s.msg = `${msgId(ctx, "2215I")} LINE ${n} VOIDED - ${l.desc}`;
+				return s;
+			}
+			case pf(10): {
+				if (s.tenders.length > 0) return fail("qty", "2211E PAYMENT HAS STARTED - REMOVE IT FIRST (PF5, THEN PF6)");
+				const ln = typed("line").trim();
+				const n = ln ? Number(ln) : s.lines.findLastIndex((l) => !l.void) + 1;
+				const l = s.lines[n - 1];
+				if (!l) return fail("line", ln ? `2212E THERE IS NO LINE ${ln}` : "2226E RING AN ITEM FIRST");
+				if (l.void) return fail("line", `2214E LINE ${n} IS VOID`);
+				if (l.ret) return fail("line", `2227E LINE ${n} IS A RETURN - VOID IT AND RETURN AGAIN`);
+				if (l.card) return fail("line", `2228E LINE ${n} IS A GIFT CARD - ITS QTY CAN'T CHANGE`);
+				const qty = readQty(l.weighed ? typed("qty") : (inp.fields.qty ?? ""), l.weighed);
+				if (qty === undefined) return fail("qty", l.weighed ? `2229E KEY THE POUNDS FOR LINE ${n}, E.G. 1.25` : "2208E QTY MUST BE 1 TO 999", { qty: "" });
+				l.qty = qty;
+				l.amount = lineAmount(qty, l.price);
+				s.msg = `${msgId(ctx, "2230I")} LINE ${n} ${l.desc} NOW ${showQty(qty, l.weighed)} @ ${dollars(l.price)} = ${dollars(l.amount)}`;
 				return s;
 			}
 			case pf(12): {
