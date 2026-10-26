@@ -13,8 +13,9 @@ registers, items, departments, price books and employees. Phase 2 is the
 register: sign-on, drawers, sales, tenders, receipts and post-voids;
 discounts, price overrides, coupons and promotions; returns, customers,
 suspended sales, gift cards and store credit. Phase 3 is the back office,
-starting with inventory: the stock ledger, adjustments, counts and
-transfers.
+starting with inventory (the stock ledger, adjustments, counts and
+transfers) and purchasing (vendors, purchase orders, receiving, suggested
+orders, reorder points and returns to vendors).
 
 ## The back office
 
@@ -36,6 +37,14 @@ transfers.
 | POS321 | Count: key what is on the shelf; PF10 posts it, setting on hand to what was counted | same |
 | POS330 | 2.4 TRANSFERS: stock sent between stores | same |
 | POS331 | Transfer: start one (up to ten items); PF10 sends it, then PF10 at the other store receives it | same |
+| POSM03 | 3 PURCHASING | buyers, admins, managers (their stores) |
+| POS360 | 3.1 VENDORS: the vendor file; codes already on items became vendors | buyers, admins |
+| POS361 | Vendor: name, contact, terms, lead time | buyers, admins |
+| POS370 | 3.2 ORDERS: purchase orders, open ones first; PF6 shows all | buyers, admins, managers (their stores) |
+| POS371 | Purchase order: start one (up to twelve items), PF10 orders it; key what came in to receive it, PF10 to receive and close | same |
+| POS372 | 3.3 SUGGESTED: what a store should order from a vendor; PF10 makes a draft PO | same |
+| POS373 | 3.4 REORDER: min and max per store and item | same |
+| POS380 | 3.5 RETURNS: stock sent back to a vendor | same |
 | POS410 | 4 EMPLOYEES: people, roles, userids, operator IDs, stores | admins |
 | POS411 | Employee: add or update | admins |
 | POSM08 | 8 ADMIN | admins |
@@ -44,9 +53,10 @@ transfers.
 | POS820 | 8.2 REGISTERS: a store's registers, changed in place, and the service token each enrolled register signs on with | admins |
 | POS200 | R REGISTER: run a register on this terminal | supervisors, managers, admins |
 
-Menu numbers follow the plan (3 PURCHASING, 5 END OF DAY, 6 REPORTS and
-7 CUSTOMERS come later), so fast paths like `=1.3` won't move. Inventory's
-maps are POS31x to POS33x, since the register has POS2xx.
+Menu numbers follow the plan (5 END OF DAY, 6 REPORTS and 7 CUSTOMERS
+come later), so fast paths like `=1.3` won't move. Inventory's maps are
+POS31x to POS33x and purchasing's POS36x to POS38x, since the register
+has POS2xx.
 
 Rules worth knowing:
 
@@ -68,6 +78,13 @@ Rules worth knowing:
   every five minutes posts any the queue missed; a post-voided sale is
   put back. On hand can go below zero: the register never refuses a sale
   for stock.
+- **Receiving** puts what came on hand and makes the item's cost the
+  average of what was on hand (across stores) and what came, at the PO's
+  cost. A delivery keyed twice is received once.
+- **Suggested orders** bring an item with reorder points back up to its
+  max once on hand plus on order is at its min. Without reorder points,
+  they cover the last 28 days' sales rate over the vendor's lead time
+  plus two weeks.
 - **Money** is in cents; tax rates are in thousandths of a percent (8.25% is
   8250).
 

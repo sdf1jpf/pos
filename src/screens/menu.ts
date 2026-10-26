@@ -18,6 +18,7 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 		options: [
 			{ key: "1", name: "PRODUCTS", desc: "Items, depts, prices", aliases: ["P"], sub: "1" },
 			{ key: "2", name: "INVENTORY", desc: "On hand, counts, transfers", aliases: ["IN"], sub: "2" },
+			{ key: "3", name: "PURCHASING", desc: "Vendors, orders, receiving", aliases: ["PU"], sub: "3" },
 			{ key: "4", name: "EMPLOYEES", desc: "People and roles", aliases: ["E"], right: "employees", go: go("employees") },
 			{ key: "8", name: "ADMIN", desc: "Stores and registers", aliases: ["A"], sub: "8" },
 			{ key: "R", name: "REGISTER", desc: "Run a register on this terminal", right: "register", go: go("lane") },
@@ -43,6 +44,17 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 			{ key: "2", name: "ADJUST", desc: "Damage, shrink, found", aliases: ["A"], right: "inventory", go: (_ctx, back) => ({ p: "adjust", back, token: crypto.randomUUID() }) },
 			{ key: "3", name: "COUNTS", desc: "Cycle and full counts", aliases: ["C"], right: "inventory", go: go("counts") },
 			{ key: "4", name: "TRANSFERS", desc: "Stock sent between stores", aliases: ["T"], right: "inventory", go: go("transfers") },
+		],
+	},
+	"3": {
+		map: "POSM03",
+		title: "PURCHASING",
+		options: [
+			{ key: "1", name: "VENDORS", desc: "The vendor file", aliases: ["V"], right: "items", go: go("vendors") },
+			{ key: "2", name: "ORDERS", desc: "Purchase orders and receiving", aliases: ["PO", "R"], right: "purchasing", go: go("pos") },
+			{ key: "3", name: "SUGGESTED", desc: "What to order, by vendor", aliases: ["S"], right: "purchasing", go: (_ctx, back) => ({ p: "suggested", back }) },
+			{ key: "4", name: "REORDER", desc: "Min and max by store", aliases: ["MM"], right: "purchasing", go: go("reorder") },
+			{ key: "5", name: "RETURNS", desc: "Stock back to a vendor", aliases: ["RV"], right: "purchasing", go: (_ctx, back) => ({ p: "vreturn", back, token: crypto.randomUUID() }) },
 		],
 	},
 	"8": {
@@ -72,7 +84,7 @@ const built = new Map<string, ReturnType<typeof menuProgram<Env>>>();
 
 async function menuOf(ctx: PosCtx) {
 	const w = await who(ctx);
-	const rights = (["items", "prices", "inventory", "stores", "employees", "register"] as const).filter((r) => can(w, r));
+	const rights = (["items", "prices", "inventory", "purchasing", "stores", "employees", "register"] as const).filter((r) => can(w, r));
 	const key = rights.join(",");
 	let m = built.get(key);
 	if (!m) {

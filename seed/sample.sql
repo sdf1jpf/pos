@@ -88,6 +88,19 @@ INSERT OR IGNORE INTO items (sku, upc, descr, dept, class, vendor, cost, price, 
 	('700400', '028400001021', 'PRETZELS, TWISTS 16 OZ', 70, 'CHIP', 'OHIOBEV', 169, 379, 1, 0, 'A', '2026-10-26T00:00:00Z', 'SAMPLE'),
 	('700500', '040000001010', 'CANDY BAR, MILK CHOC', 70, 'CNDY', 'OHIOBEV', 62, 149, 1, 0, 'A', '2026-10-26T00:00:00Z', 'SAMPLE');
 
+-- Vendors (the migration made one for each code already on items; these
+-- give them names, for a database loaded fresh).
+INSERT OR IGNORE INTO vendors (code, name, phone, terms, lead_days, updated_at, updated_by) VALUES
+	('ACMEFOOD', 'ACME FOOD DISTRIBUTORS', '800-555-0110', 'NET 30', 7, '2026-10-26T00:00:00Z', 'SAMPLE'),
+	('BUCKEYDY', 'BUCKEYE DAIRY', '614-555-0150', 'NET 10', 2, '2026-10-26T00:00:00Z', 'SAMPLE'),
+	('DAYBAKE', 'DAYTON BAKING CO', '937-555-0160', 'NET 7', 1, '2026-10-26T00:00:00Z', 'SAMPLE'),
+	('HOMEGDS', 'HOME GOODS SUPPLY', '800-555-0130', 'NET 30', 10, '2026-10-26T00:00:00Z', 'SAMPLE'),
+	('MIAMIMT', 'MIAMI VALLEY MEATS', '937-555-0170', 'NET 10', 3, '2026-10-26T00:00:00Z', 'SAMPLE'),
+	('OHIOBEV', 'OHIO BEVERAGE', '614-555-0180', 'NET 30', 5, '2026-10-26T00:00:00Z', 'SAMPLE'),
+	('TOOLCO', 'TOOL COMPANY', '800-555-0140', 'NET 45', 14, '2026-10-26T00:00:00Z', 'SAMPLE'),
+	('VALLEYFM', 'VALLEY FARMS', '937-555-0120', 'NET 10', 2, '2026-10-26T00:00:00Z', 'SAMPLE'),
+	('WELLRX', 'WELLNESS SUPPLY', '800-555-0190', 'NET 30', 7, '2026-10-26T00:00:00Z', 'SAMPLE');
+
 INSERT OR IGNORE INTO prices (store, sku, price, updated_at, updated_by) VALUES
 	(2, '100100', 849, '2026-10-26T00:00:00Z', 'SAMPLE'),
 	(2, '150100', 389, '2026-10-26T00:00:00Z', 'SAMPLE'),

@@ -22,6 +22,7 @@ import { adjustStock, count, counts, stock, stockLedger, transfer, transfers } f
 import { item, items } from "./screens/items";
 import { menu } from "./screens/menu";
 import { prices } from "./screens/prices";
+import { po, pos, reorder, suggested, vendor, vendorReturn, vendors } from "./screens/purchasing";
 import { coupon, coupons, promotion, promotions } from "./screens/promos";
 import { registers, store, stores } from "./screens/stores";
 
@@ -39,6 +40,7 @@ const app = createApp<Env>({
 	programs: {
 		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
+		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn,
 		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},
@@ -114,6 +116,8 @@ const app = createApp<Env>({
 		"adjust.qty": { title: "CHANGE", lines: ["How many more there are (5) or fewer (-5). Pounds for a weighed", "item, e.g. -1.25."] },
 		"stock.sel": { title: "SELECTION CODE", lines: ["L shows the item's ledger; A adjusts its on hand."], values: values(["L", "LEDGER"], ["A", "ADJUST"]) },
 		"counts.dept": { title: "DEPARTMENT", lines: ["PF5 starts a cycle count of this department's items. Blank counts", "every item."], values: async (ctx) => deptValues(ctx.env.DB) },
+		"vendor.leadDays": { title: "LEAD TIME", lines: ["Days from ordering to delivery. Suggested orders cover sales over", "the lead time plus two weeks."] },
+		"pos.sel": { title: "SELECTION CODE", lines: ["S shows a purchase order: to order a draft, or receive a delivery."], values: values(["S", "SHOW/RECEIVE"]) },
 		"employee.stores": { title: "STORES", lines: ["The store numbers the person works at, separated by commas.", "Blank means every store."] },
 	}),
 	stateKey: (env) => env.STATE_KEY,
