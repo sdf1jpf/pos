@@ -1,7 +1,7 @@
 // POS237 ITEM LOOKUP: from the sale, PF11 finds an item by a word in its
 // description, the start of its SKU, or its UPC, with the store's price and
-// on hand. S beside one rings one of it; an item sold by weight goes back to
-// the sale for the pounds.
+// on hand. S beside one goes back to the sale with it keyed in ITEM and the
+// cursor on QTY, so Enter rings one or the clerk keys how many first.
 
 import { invalidKey, keys, label, lpad, message, msgId, pad, panel, pf, withFill } from "@greenscreen-dev/worker";
 import { findItem, lookupItems } from "../data/register";
@@ -9,7 +9,6 @@ import { showQty } from "../data/stock";
 import type { Env } from "../env";
 import { dollars } from "../money";
 import { onLane, laneScreen } from "./common";
-import { ring } from "./sale";
 import type { LookupState } from "./types";
 
 const FIRST = 8;
@@ -24,7 +23,7 @@ export const lookup = onLane(panel<LookupState, Env>({
 		s.keys = items.map((x) => x.sku);
 		label(scr, 4, 2, "SEARCH ===>");
 		scr.input(4, 14, 30, "q", s.q);
-		scr.text(5, 2, "A WORD FROM THE DESCRIPTION, THE START OF A SKU, OR A UPC. SELECT: S=RING ONE", { color: "blue" });
+		scr.text(5, 2, "A WORD FROM THE DESCRIPTION, THE START OF A SKU, OR A UPC. S=TAKE IT TO THE SALE", { color: "blue" });
 		scr.text(6, 2, "S SKU            DESCRIPTION                          PRICE      ON HAND", { color: "white", bright: true });
 		scr.text(7, 2, "-".repeat(scr.cols - 3), { color: "blue" });
 		if (items.length === 0) scr.text(FIRST, 4, s.q ? `NOTHING ON SALE MATCHES ${s.q}` : "NO ITEMS ARE ON SALE", { color: "blue" });
@@ -73,17 +72,13 @@ export const lookup = onLane(panel<LookupState, Env>({
 			if (code !== "S") return fail(`2371E INVALID SELECTION CODE "${code}" - TYPE S`);
 			const it = await findItem(ctx.env.DB, s.lane.store, sku);
 			if (!it || it === "discontinued") return fail(`2372E ITEM ${sku} WAS JUST TAKEN OFF SALE`);
+			// Back to the sale with the item keyed and the cursor on QTY: Enter
+			// rings one, or the clerk keys how many (or the pounds) first.
 			const sale = s.back;
-			sale.msg = sale.errField = undefined;
-			// One of it, as a scan rings; pounds come from the scale.
-			if (it.weighed) {
-				sale.msg = `${msgId(ctx, "2373I")} ${it.desc} IS SOLD BY WEIGHT - KEY THE POUNDS AND PRESS ENTER`;
-				sale.errField = "qty";
-				return withFill(sale, { fields: { item: it.sku, qty: "" }, cursor: "qty" });
-			}
-			const err = ring(ctx, sale, it, 1000);
-			if (err) return fail(err);
-			return sale;
+			sale.errField = undefined;
+			sale.msg = it.weighed ? `${msgId(ctx, "2373I")} ${it.desc} IS SOLD BY WEIGHT - KEY THE POUNDS AND PRESS ENTER`
+				: `${msgId(ctx, "2374I")} ${it.desc} ${dollars(it.price)} - KEY THE QTY OR PRESS ENTER FOR 1`;
+			return withFill(sale, { fields: { item: it.sku, qty: it.weighed ? "" : "1" }, cursor: "qty" });
 		}
 		// No selection: search for what was typed.
 		s.q = (inp.fields.q ?? "").trim().toUpperCase();

@@ -30,10 +30,23 @@ describe("item lookup", () => {
 		expect(g).toMatch(/300100\s+MUG, STONEWARE 12 OZ\s+5\.99\s+12/);
 		expect(g).not.toContain("HAMMER");
 
+		// S takes it back to the sale, keyed, with the cursor on QTY.
 		r = await t.key("ENTER", { "sel:300100": "S" });
 		expect(map(r)).toBe("POS220");
+		expect(text(r)).toContain("POS2374I MUG, STONEWARE 12 OZ 5.99 - KEY THE QTY OR PRESS ENTER FOR 1");
+		expect(value(r, "item")).toBe("300100");
+		expect(value(r, "qty")).toBe("1");
+		expect((r.screen as { cursor?: { field?: string } }).cursor?.field).toBe("qty");
+		expect(text(r)).not.toContain("ITEMS 1");
+		r = await t.key("ENTER", { qty: "3" });
+		expect(text(r)).toContain("POS2210I MUG, STONEWARE 12 OZ 3 @ 5.99 = 17.97");
+
+		// Enter alone rings one.
+		await t.key("PF11", { item: "MUG" });
+		r = await t.key("ENTER", { "sel:300100": "S" });
+		r = await t.key("ENTER");
 		expect(text(r)).toContain("POS2210I MUG, STONEWARE 12 OZ 1 @ 5.99 = 5.99");
-		expect(text(r)).toContain("ITEMS 1");
+		expect(text(r)).toContain("ITEMS 2");
 	});
 
 	it("searches every word, by SKU start and UPC, and sends weighed items back for pounds", async () => {
