@@ -22,9 +22,9 @@ describe("sign-on", () => {
 			expect(map(r)).toBe("POSM00");
 			return r.screen!.fields.filter((f) => f.row >= 6 && f.col === 7).map((f) => f.text);
 		};
-		expect(await options("ADMIN")).toEqual(["PRODUCTS", "EMPLOYEES", "ADMIN", "EXIT"]);
+		expect(await options("ADMIN")).toEqual(["PRODUCTS", "EMPLOYEES", "ADMIN", "REGISTER", "EXIT"]);
 		expect(await options("BUYER")).toEqual(["PRODUCTS", "EXIT"]);
-		expect(await options("MANAGER")).toEqual(["PRODUCTS", "EXIT"]);
+		expect(await options("MANAGER")).toEqual(["PRODUCTS", "REGISTER", "EXIT"]);
 
 		const t = terminal("MANAGER");
 		await t.key("START");

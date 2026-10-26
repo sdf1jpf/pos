@@ -38,6 +38,7 @@ export interface Register {
 	reg: number;
 	name: string;
 	status: Status;
+	token: string; // the client ID of the Access service token it signs on with, or ""
 }
 
 const COLS = `store, name, addr1, addr2, city, state, zip, phone, tax_rate AS taxRate, discount_limit AS discountLimit,
@@ -121,7 +122,7 @@ export async function updateStore(db: D1Database, userid: string, version: numbe
 }
 
 export async function listRegisters(db: D1Database, store: number): Promise<Register[]> {
-	return (await db.prepare("SELECT store, reg, name, status FROM registers WHERE store = ? ORDER BY reg").bind(store).all<Register>()).results;
+	return (await db.prepare("SELECT store, reg, name, status, COALESCE(token_id, '') AS token FROM registers WHERE store = ? ORDER BY reg").bind(store).all<Register>()).results;
 }
 
 // checkRegister checks a register's number, name and status as typed.
@@ -141,15 +142,25 @@ export async function addRegister(db: D1Database, userid: string, store: number,
 			.bind(store, r.reg, r.name, at, userid),
 		audit(db, userid, { action: "REGISTER.ADD", subject: `${store}/${r.reg}`, store, reg: r.reg, detail: r.name }, at),
 	]), new Invalid("reg", `REGISTER ${r.reg} ALREADY EXISTS IN STORE ${store}`));
-	return { store, reg: r.reg, name: r.name, status: "A" };
+	return { store, reg: r.reg, name: r.name, status: "A", token: "" };
 }
 
-export async function updateRegister(db: D1Database, userid: string, store: number, reg: number, name: string, status: string): Promise<void> {
+// checkToken checks an Access service token client ID as typed: 32 hex
+// digits, with or without the ".access" Cloudflare adds.
+function checkToken(token: string): string {
+	const t = token.trim().toLowerCase();
+	if (!t) return "";
+	if (!/^[0-9a-f]{32}(\.access)?$/.test(t)) throw new Invalid("token", "TOKEN MUST BE A SERVICE TOKEN CLIENT ID, E.G. 0123...CDEF.ACCESS");
+	return t.endsWith(".access") ? t : `${t}.access`;
+}
+
+export async function updateRegister(db: D1Database, userid: string, store: number, reg: number, name: string, status: string, token: string): Promise<void> {
 	const r = checkRegister(String(reg), name, status);
+	const t = checkToken(token);
 	const at = now();
-	await db.batch([
-		db.prepare("UPDATE registers SET name = ?, status = ?, updated_at = ?, updated_by = ? WHERE store = ? AND reg = ?")
-			.bind(r.name, r.status, at, userid, store, reg),
-		audit(db, userid, { action: "REGISTER.UPDATE", subject: `${store}/${reg}`, store, reg, detail: `name=${r.name} status=${r.status}` }, at),
-	]);
+	await unique(db.batch([
+		db.prepare("UPDATE registers SET name = ?, status = ?, token_id = ?, updated_at = ?, updated_by = ? WHERE store = ? AND reg = ?")
+			.bind(r.name, r.status, t || null, at, userid, store, reg),
+		audit(db, userid, { action: "REGISTER.UPDATE", subject: `${store}/${reg}`, store, reg, detail: `name=${r.name} status=${r.status} token=${t}` }, at),
+	]), new Invalid("token", "THAT TOKEN IS ENROLLED AT ANOTHER REGISTER"));
 }

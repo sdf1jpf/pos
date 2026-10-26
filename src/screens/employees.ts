@@ -1,7 +1,9 @@
-import { clock, header, invalidKey, keys, lpad, message, msgId, newScreen, pad, panel, pf } from "@greenscreen-dev/worker";
+import { clock, dots, header, invalidKey, keys, label, lpad, message, msgId, newScreen, pad, panel, pf } from "@greenscreen-dev/worker";
 import { addEmployee, getEmployee, listEmployees, updateEmployee, type EmployeeInput } from "../data/employees";
+import { pinState, setPin, validPin } from "../data/pins";
 import type { Env } from "../env";
-import { FIRST, form, guarded, listRows, pick, refused, rowCount, rule, scroll, selected } from "./common";
+import { Invalid } from "../data/db";
+import { FIELD_COL, FIRST, form, guarded, listRows, pick, refused, rowCount, rule, scroll, selected } from "./common";
 import type { EmployeesState, EmployeeState } from "./types";
 
 // POS410 EMPLOYEES: everyone on file, by name. S beside one shows them for
@@ -89,9 +91,15 @@ export const employee = guarded("employees", panel<EmployeeState, Env>({
 			{ row: 9, label: "STORES", name: "stores", len: 30, value: e?.stores.join(",") ?? "", note: "E.G. 1,3; BLANK FOR ALL" },
 			{ row: 10, label: "STATUS", name: "status", len: 1, value: e?.status ?? "A", note: "A=ACTIVE  I=INACTIVE" },
 		], s.errField);
-		scr.text(12, 2, "THE USERID IS THE PART OF THE PERSON'S EMAIL BEFORE THE @,", { color: "blue" });
-		scr.text(13, 2, "LETTERS AND DIGITS ONLY, AT MOST 8 CHARACTERS: JANE.DOE@ BECOMES JANEDOE.", { color: "blue" });
-		if (e) scr.text(15, 2, `LAST CHANGED ${clock(ctx, e.updatedAt)} BY ${e.updatedBy}   VERSION ${e.version}`, { color: "blue" });
+		const pin = e ? await pinState(ctx.env.DB, e.emp) : "NONE";
+		label(scr, 11, 2, dots("REGISTER PIN", FIELD_COL - 3));
+		scr.input(11, FIELD_COL, 4, "pin", "", { hidden: true, numeric: true, bright: s.errField === "pin" });
+		scr.text(11, FIELD_COL + 6, { NONE: "NONE SET", SET: "SET", LOCKED: "LOCKED OUT" }[pin] + " - 4 DIGITS SETS A NEW ONE", {
+			color: pin === "LOCKED" ? "yellow" : "blue",
+		});
+		scr.text(13, 2, "THE USERID IS THE PART OF THE PERSON'S EMAIL BEFORE THE @,", { color: "blue" });
+		scr.text(14, 2, "LETTERS AND DIGITS ONLY, AT MOST 8 CHARACTERS: JANE.DOE@ BECOMES JANEDOE.", { color: "blue" });
+		if (e) scr.text(16, 2, `LAST CHANGED ${clock(ctx, e.updatedAt)} BY ${e.updatedBy}   VERSION ${e.version}`, { color: "blue" });
 		message(scr, s.msg ?? "");
 		keys(scr, `PF1=HELP  PF3=RETURN  ENTER=${e ? "UPDATE" : "ADD"}`);
 		scr.cursorTo(s.errField ?? "name");
@@ -106,16 +114,20 @@ export const employee = guarded("employees", panel<EmployeeState, Env>({
 			return s;
 		}
 		const typed: EmployeeInput = pick(inp, FIELDS);
+		const pin = (inp.fields.pin ?? "").trim();
 		try {
+			if (pin && !validPin(pin)) throw new Invalid("pin", "PIN MUST BE 4 DIGITS");
 			if (s.emp !== undefined) {
 				const e = await updateEmployee(ctx.env.DB, ctx.user, s.emp, s.version ?? 0, typed);
 				s.version = e.version;
 				s.msg = `${msgId(ctx, "0403I")} EMPLOYEE ${e.emp} UPDATED`;
+				if (pin) await setPin(ctx.env.DB, ctx.user, e.emp, pin);
 			} else {
 				const e = await addEmployee(ctx.env.DB, ctx.user, typed);
 				s.emp = e.emp;
 				s.version = e.version;
 				s.msg = `${msgId(ctx, "0404I")} EMPLOYEE ${e.emp} ADDED`;
+				if (pin) await setPin(ctx.env.DB, ctx.user, e.emp, pin);
 			}
 			return s;
 		} catch (e) {

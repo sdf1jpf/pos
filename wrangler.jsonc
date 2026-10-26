@@ -2,7 +2,7 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "greenscreen-pos",
 	"account_id": "d64e67ce2f5262eef1178cd4d08c5380",
-	"main": "src/index.ts",
+	"main": "src/worker.ts",
 	"compatibility_date": "2026-10-01",
 	"observability": { "enabled": true },
 	// The browser terminal, from @greenscreen-dev/web, served at /. Requests
@@ -16,6 +16,10 @@
 			"migrations_dir": "migrations"
 		}
 	],
+	// Sessions and record locks (one terminal at a time runs a register), in
+	// greenscreen's Sessions Durable Object.
+	"durable_objects": { "bindings": [{ "name": "SESSIONS", "class_name": "Sessions" }] },
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sessions"] }],
 	// Cloudflare Access guards the back office; the Worker verifies its JWT.
 	// ACCESS_AUD is the audience tag of the Access application for
 	// greenscreen-pos.justin-frank.workers.dev (see README).
