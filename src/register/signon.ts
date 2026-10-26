@@ -1,4 +1,5 @@
 import { clock, invalidKey, keys, label, logoff, message, msgId, newScreen, header, panel, pf, withFill } from "@greenscreen-dev/worker";
+import { siteNo } from "../data/db";
 import { canStore, who } from "../access";
 import { clerkByUserid } from "../data/employees";
 import { checkPin, type Operator } from "../data/pins";
@@ -223,6 +224,6 @@ export const opendrawer = onLane(panel<OpenDrawerState, Env>({
 		if (!readCountsInto(ctx, s, inp)) return s;
 		if (inp.aid === "ENTER") return s;
 		const drawer = await openDrawer(ctx.env.DB, s.lane, s.counts);
-		return newSale({ ...s.lane, drawer }, `${msgId(ctx, "2111I")} DRAWER ${drawer} OPENED`);
+		return newSale({ ...s.lane, drawer }, `${msgId(ctx, "2111I")} DRAWER ${siteNo(drawer)} OPENED`);
 	},
 }));

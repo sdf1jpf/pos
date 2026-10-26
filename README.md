@@ -15,7 +15,10 @@ discounts, price overrides, coupons and promotions; returns, customers,
 suspended sales, gift cards and store credit. Phase 3 is the back office,
 starting with inventory (the stock ledger, adjustments, counts and
 transfers) and purchasing (vendors, purchase orders, receiving, suggested
-orders, reorder points and returns to vendors).
+orders, reorder points and returns to vendors). Phase 4 is in-store
+mode: a store server runs the registers on the store's own machine, so a
+store keeps selling when its internet is down (see "In-store mode" below
+and [store/README.md](store/README.md)).
 
 ## The back office
 
@@ -63,7 +66,7 @@ orders, reorder points and returns to vendors).
 | POS720 | 7.2 GIFT CARDS: a gift card's or store credit's balance and history; adjust it with a reason code, PF11 stops or starts it | same |
 | POSM08 | 8 ADMIN | admins, managers (audit log) |
 | POS810 | 8.1 STORES: S shows a store, R its registers | admins |
-| POS811 | Store: address, tax rate, discount limit, receipt header and footer | admins |
+| POS811 | Store: address, tax rate, discount limit, receipt header and footer, the service token its store server signs on with, and when that server was last heard from | admins |
 | POS820 | 8.2 REGISTERS: a store's registers, changed in place, and the service token each enrolled register signs on with | admins |
 | POS830 | 8.3 AUDIT LOG: every change, newest first, by store, userid, action and date; S shows one in full | admins, managers (their stores) |
 | POS831 | Audit entry: one change, its detail in full | same |
@@ -180,6 +183,38 @@ Rules worth knowing:
   its client ID beside the register on POS820. The terminal on that lane
   then signs on with the token.
 
+## In-store mode
+
+A store can run its registers on a store server: this same Worker, on a
+machine in the store, under wrangler's local runtime (workerd) with its own
+SQLite database. Its registers keep selling with the internet down, and
+the server and the cloud catch each other up when it's back. Setting one
+up is in [store/README.md](store/README.md).
+
+- **What goes where.** The cloud sends down the master data the registers
+  need: stores, the store's own registers and prices, departments, items,
+  promotions, coupons, employees, reason codes, customers and gift card
+  balances. The store sends up what its registers write: drawers, sales
+  with their lines, tenders and adjustments, paid in and out, punches,
+  customers added at the register, gift card moves and the audit log. The
+  back office, posting to the stock ledger and end of day stay in the cloud.
+- **How.** Triggers log each change (`changes`, migration 0011). Every few
+  seconds the store server sends its changes up (`POST /v1/sync`) and asks
+  for the cloud's since the last it had (`GET /v1/sync?since=`), signed on
+  through Access with its own service token. Each row is written by its
+  key, so a change sent twice does no harm.
+- **Numbers.** A store server numbers what its registers write from its own
+  range (store x 10^10 up), so rows keep their ids in the cloud. Its
+  receipts are marked L: `1-01-L000123`.
+- **Gift cards** are spent offline against the last balance the store had.
+  A card spent in two places while a store was cut off stops at nothing in
+  the cloud, which writes a `CARD.OVERDRAWN` audit row.
+- **Returns** with a receipt need the sale on the same server: a store
+  server has the sales rung on it, the cloud has every sale.
+- **Sign-on.** Access isn't in front of a store server, so it checks its
+  registers' service tokens itself (`REGISTER_TOKENS`). Clerks signing on
+  through Access with their own login (POS201) do so through the cloud.
+
 ## Layout
 
 ```
@@ -187,6 +222,7 @@ src/index.ts         the app: panels, logon check, field help
 src/access.ts        who is signed on, their role and stores
 src/worker.ts        the Worker's entry: the app, the posting queue and cron, the Sessions Durable Object
 src/posting.ts       posting paid sales to the stock ledger
+src/sync.ts          in-store mode: a store server's sync with the cloud (src/data/sync.ts has the SQL)
 src/closeday.ts      the Workflow that closes a store's day
 src/pdf.ts           reports as PDFs, written by hand (Courier, nothing embedded)
 src/data/*.ts        stores, items, employees, PINs, the register: SQL, validation, audit
@@ -195,7 +231,9 @@ src/register/*.ts    the register panels
 migrations/          the D1 schema
 seed.sql             the small fixture the tests use
 seed/sample.sql      fuller sample data: 3 stores, ~50 items, every role
+store/               the store server: its wrangler config, launcher and settings
 test/                tests against a real (local) D1, through POST /v1/screen
+test/store/          the offline test: a cloud and a store server, the cloud cut off mid-way
 ```
 
 ## Run it locally

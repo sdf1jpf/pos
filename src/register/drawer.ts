@@ -1,5 +1,5 @@
 import { invalidKey, keys, label, lpad, message, msgId, panel, pf, withFill, type Input, type Screen } from "@greenscreen-dev/worker";
-import { Invalid } from "../data/db";
+import { Invalid, siteNo } from "../data/db";
 import { closeDrawer, countTotal, DENOMS, drawerMove, drawerTotals, laneAudit, readCounts, suspend, type Counts } from "../data/register";
 import type { Env } from "../env";
 import { cents, dollars } from "../money";
@@ -181,7 +181,7 @@ export const closedrawer = onLane(panel<CloseDrawerState, Env>({
 				label(scr, r, 4, l);
 				scr.text(r, 24, lpad(dollars(v), 10), { color: bright ? "white" : "green", bright });
 			};
-			scr.text(5, 2, `DRAWER ${s.lane.drawer} CLOSED - ${t.sales} SALE(S)`, { color: "white", bright: true });
+			scr.text(5, 2, `DRAWER ${siteNo(s.lane.drawer ?? 0)} CLOSED - ${t.sales} SALE(S)`, { color: "white", bright: true });
 			row(7, "OPENING FLOAT", t.opening);
 			row(8, "CASH SALES", t.cashSales);
 			row(9, "PAID IN", t.paidIn);
@@ -224,7 +224,7 @@ export const closedrawer = onLane(panel<CloseDrawerState, Env>({
 		}
 		await laneAudit(ctx.env.DB, s.lane, "REG.SIGNOFF");
 		const o = s.closed.overShort;
-		s.msg = `${msgId(ctx, o === 0 ? "2503I" : "2504W")} DRAWER ${s.lane.drawer} CLOSED${o === 0 ? " - IN BALANCE" : o < 0 ? ` - SHORT ${dollars(-o)}` : ` - OVER ${dollars(o)}`}`;
+		s.msg = `${msgId(ctx, o === 0 ? "2503I" : "2504W")} DRAWER ${siteNo(s.lane.drawer ?? 0)} CLOSED${o === 0 ? " - IN BALANCE" : o < 0 ? ` - SHORT ${dollars(-o)}` : ` - OVER ${dollars(o)}`}`;
 		return s;
 	},
 }));

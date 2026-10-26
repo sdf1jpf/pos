@@ -1,6 +1,7 @@
 import { clock, header, invalidKey, keys, label, lpad, message, msgId, newScreen, pad, panel, pf, withFill } from "@greenscreen-dev/worker";
 import { canStore, who } from "../access";
 import { Invalid } from "../data/db";
+import { syncState } from "../data/sync";
 import { addRegister, addStore, getStore, listRegisters, listStores, storeNumber, updateRegister, updateStore, type StoreInput } from "../data/stores";
 import type { Env } from "../env";
 import { rate } from "../money";
@@ -73,7 +74,7 @@ export const stores = guarded("stores", panel<StoresState, Env>({
 // POS811 STORE: one store, to add or update.
 
 const FIELDS = ["store", "name", "addr1", "addr2", "city", "state", "zip", "phone", "taxRate", "discountLimit",
-	"header1", "header2", "footer1", "footer2", "status"] as const;
+	"header1", "header2", "footer1", "footer2", "status", "serverToken"] as const;
 
 export const store = guarded("stores", panel<StoreState, Env>({
 	async render(ctx, s) {
@@ -98,11 +99,18 @@ export const store = guarded("stores", panel<StoreState, Env>({
 			{ row: 12, label: "SALES TAX RATE", name: "taxRate", len: 7, value: st ? rate(st.taxRate) : "", note: "PERCENT, E.G. 8.25" },
 			{ row: 13, label: "DISCOUNT LIMIT", name: "discountLimit", len: 3, value: st ? String(st.discountLimit) : "10", numeric: true, note: "PERCENT A CASHIER MAY GIVE WITHOUT A MANAGER" },
 			{ row: 14, label: "STATUS", name: "status", len: 1, value: st?.status ?? "A", note: "A=ACTIVE  I=INACTIVE" },
+			{ row: 15, label: "SERVER TOKEN", name: "serverToken", len: 39, value: st?.serverToken ?? "" },
 			{ row: 16, label: "RECEIPT HEADER", name: "header1", len: 38, value: st?.header1 ?? "" },
 			{ row: 17, label: "", name: "header2", len: 38, value: st?.header2 ?? "" },
 			{ row: 18, label: "RECEIPT FOOTER", name: "footer1", len: 38, value: st?.footer1 ?? "" },
 			{ row: 19, label: "", name: "footer2", len: 38, value: st?.footer2 ?? "" },
 		], s.errField);
+		const sync = st?.serverToken ? await syncState(ctx.env.DB, st.store) : undefined;
+		if (st?.serverToken) {
+			scr.text(20, 2, sync?.pushedAt
+				? `STORE SERVER LAST SENT ${clock(ctx, sync.pushedAt)}, LAST FETCHED ${sync.pulledAt ? clock(ctx, sync.pulledAt) : "NEVER"}`
+				: "STORE SERVER NOT HEARD FROM YET", { color: "turquoise" });
+		}
 		if (st) scr.text(21, 2, `LAST CHANGED ${clock(ctx, st.updatedAt)} BY ${st.updatedBy}   VERSION ${st.version}`, { color: "blue" });
 		message(scr, s.msg ?? "");
 		keys(scr, `PF3=RETURN  ENTER=${st ? "UPDATE" : "ADD"}`);

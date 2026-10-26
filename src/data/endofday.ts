@@ -126,10 +126,21 @@ export async function zReport(db: D1Database, store: number, day: string): Promi
 
 // --- Closing and reopening ---
 
+// SERVER_FRESH_MS is how lately a store server must have synced for its
+// day to close.
+const SERVER_FRESH_MS = 2 * 60_000;
+
 // startClose marks a day as closing, under a Workflow instance. A day
 // already closed can't be closed again until it is reopened; a close that
 // failed part way can be started again.
 export async function startClose(db: D1Database, userid: string, store: number, day: string, workflow: string): Promise<void> {
+	// A store with its own server: only once the server has caught up, so
+	// its drawers and sales are all here.
+	const server = await db.prepare(`SELECT s.server_token AS token, y.pulled_at AS at FROM stores s LEFT JOIN sync_state y ON y.store = s.store
+		WHERE s.store = ?`).bind(store).first<{ token: string | null; at: string | null }>();
+	if (server?.token && (!server.at || Date.now() - Date.parse(server.at) > SERVER_FRESH_MS)) {
+		throw new Invalid("", `THE STORE SERVER HASN'T SYNCED SINCE ${server.at ? server.at.slice(0, 16).replace("T", " ") + " UTC" : "IT WAS SET UP"} - CHECK IT`);
+	}
 	if ((await openDrawers(db, store)).length > 0) throw new Invalid("", "CLOSE EVERY DRAWER FIRST");
 	const r = await db.prepare(`INSERT INTO store_days (store, day, status, workflow) VALUES (?, ?, 'R', ?)
 		ON CONFLICT (store, day) DO UPDATE SET status = 'R', workflow = excluded.workflow WHERE status <> 'C'`).bind(store, day, workflow).run();

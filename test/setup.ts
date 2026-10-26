@@ -2,6 +2,7 @@ import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 
 await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+await applyD1Migrations(env.STORE_DB, env.TEST_MIGRATIONS);
 const statements = env.TEST_SEED.split(/;\s*$/m)
 	.map((s) => s.replace(/^--.*$/gm, "").trim())
 	.filter(Boolean);

@@ -22,6 +22,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Offline test (a store server with the cloud cut off)
+        run: npm run test:store
 
   deploy:
     name: Deploy

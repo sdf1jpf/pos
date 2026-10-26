@@ -8,6 +8,8 @@ export default defineConfig(async () => ({
 			wrangler: { configPath: "./wrangler.jsonc" },
 			remoteBindings: false,
 			miniflare: {
+				// A store server's database, for the sync tests.
+				d1Databases: ["STORE_DB"],
 				// No Access in the tests: each request signs on as DEV_USER,
 				// which the tests set per terminal.
 				bindings: {

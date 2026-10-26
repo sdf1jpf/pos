@@ -3,7 +3,7 @@
 // A sale is rung up in the screen's state and written once, whole, when it
 // is paid for (or cancelled), in one batch with its audit rows.
 
-import { audit, Invalid, nextId, now } from "./db";
+import { audit, Invalid, nextId, now, siteNo } from "./db";
 import { wholeAdj, type Adj, type Priced } from "./pricing";
 import { priceAt } from "./items";
 
@@ -156,7 +156,7 @@ export async function closeDrawer(db: D1Database, lane: Lane, id: number, counts
 			store: lane.store, reg: lane.reg,
 		}, at),
 	]);
-	if ((upd.meta.changes ?? 0) === 0) throw new Invalid("", `DRAWER ${id} IS ALREADY CLOSED`);
+	if ((upd.meta.changes ?? 0) === 0) throw new Invalid("", `DRAWER ${siteNo(id)} IS ALREADY CLOSED`);
 	return { counted, expected, overShort };
 }
 

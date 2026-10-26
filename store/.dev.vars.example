@@ -1,0 +1,19 @@
+# A store server's settings. Copy to store/.dev.vars and fill in.
+
+# The store this server runs.
+STORE=1
+
+# The cloud app, and the Access service token this server signs on to it
+# with. Put the token's client ID on the store in the back office (8.1,
+# S beside the store, SERVER TOKEN), and allow the token in the Access
+# application's policy (a Service Auth rule).
+CLOUD_URL=https://greenscreen-pos.example.workers.dev
+CLOUD_TOKEN_ID=0123456789abcdef0123456789abcdef.access
+CLOUD_TOKEN_SECRET=
+
+# The registers' service tokens: each client ID to the SHA-256 of its
+# secret, in hex. npm run store:token -- <client id> <secret> prints a line.
+REGISTER_TOKENS={"0123456789abcdef0123456789abcdef.access":"<sha-256 of the secret>"}
+
+# Signs the screens' state: any long random string, kept secret.
+STATE_KEY=
