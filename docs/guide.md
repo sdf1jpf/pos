@@ -10,6 +10,11 @@ the screen is for, and the PF keys along the bottom do the rest (F1 to F12
 on a PC keyboard, F3 to go back). PF1 in a field lists what it takes. On
 the menu, `=1.3` jumps straight to option 1.3 from anywhere.
 
+In the browser the bar of clickable keys under the screen can be put away:
+press HIDE (or Alt+K) and it folds to a small KEYS button that brings it
+back. Each browser remembers the choice; add `?keys=hide` to the URL to
+start a register without it.
+
 ## The cashier
 
 **Clocking in.** On the register's sign-on screen (POS210), key your
