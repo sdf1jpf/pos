@@ -81,7 +81,7 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 		title: "CUSTOMERS",
 		options: [
 			{ key: "1", name: "CUSTOMERS", desc: "The customer file", aliases: ["C"], right: "customers", go: go("customers") },
-			{ key: "2", name: "GIFT CARDS", desc: "Gift card and store credit balances", aliases: ["G"], right: "customers", go: go("card") },
+			{ key: "2", name: "GIFT CARDS", desc: "Gift card and store credit balances", aliases: ["G"], right: "customers", go: go("giftcard") },
 		],
 	},
 	"8": {

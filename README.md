@@ -129,7 +129,8 @@ Durable Object).
 | POS211 | Open the drawer: the float, counted by denomination; PF10 opens it |
 | POS220 | Sale: scan or key a SKU or UPC, a quantity or a weight in pounds. PF2 checks a price, PF6 voids a line, PF12 (twice) voids the sale |
 | POS227 | Discount (PF9): a percent or amount off a line, a percent off the sale, or a line's price overridden with a reason |
-| POS230 | Tender: cash (with change), card (last 4 and approval code; recorded, not charged), check, gift card or store credit, split as the customer likes. A negative total is refunded: cash, card or store credit |
+| POS230 | Tender: cash (with change), card (run on the card terminal), check, gift card or store credit, split as the customer likes. A negative total is refunded: cash, card or store credit |
+| POS231 | Card terminal: the customer inserts, taps or swipes; the terminal gives the card's last 4 and approval code, or declines. Simulated: Enter approves, PF10 declines |
 | POS240 | Receipt, with the receipt number store-register-sale and its barcode text |
 | POS225 | Functions (PF4): receipts, paid in, paid out, no sale, close drawer, sign off and resume between sales; customer, return, gift card and suspend during one |
 | POS232 | Return: a receipt recalled and the quantity coming back keyed beside each line, refunded at what was paid. PF5 returns an item without a receipt, at today's price, as store credit, with approval |

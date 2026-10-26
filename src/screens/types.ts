@@ -48,7 +48,7 @@ export interface TimeCardState extends PanelState { p: "timecard"; back: PanelSt
 export interface ScheduleState extends ListState { p: "schedule"; store?: number; week?: string; errField?: string }
 export interface CustomersState extends ListState { p: "customers"; q?: string }
 export interface CustomerState extends PanelState { p: "custfile"; back: PanelState; id?: number; version?: number; errField?: string } // no id: adding
-export interface CardState extends PanelState { p: "card"; back: PanelState; number?: string; errField?: string }
+export interface CardState extends PanelState { p: "giftcard"; back: PanelState; number?: string; errField?: string }
 export interface AuditState extends ListState { p: "audit"; store?: number; userid?: string; action?: string; before?: string; errField?: string }
 export interface AuditRowState extends PanelState { p: "auditrow"; back: PanelState; id: number }
 export interface ReasonsState extends PanelState { p: "reasons"; back: PanelState; kind: string; keys?: string[]; errField?: string }

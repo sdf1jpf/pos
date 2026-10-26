@@ -148,7 +148,7 @@ export const customer = guarded("customers", panel<CustomerState, Env>({
 // balance is changed with a reason code; PF11 stops a card (lost or
 // stolen) or lets it be spent again.
 
-export const card = guarded("customers", panel<CardState, Env>({
+export const giftcard = guarded("customers", panel<CardState, Env>({
 	async render(ctx, s) {
 		const scr = newScreen(ctx, "POS720");
 		header(scr, ctx, "GIFT CARDS AND STORE CREDIT");

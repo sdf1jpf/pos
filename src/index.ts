@@ -15,10 +15,10 @@ import { approve, discount } from "./register/discount";
 import { customer, gift, resumePanel } from "./register/extras";
 import { receiptPanel, receipts } from "./register/receipt";
 import { returnPanel } from "./register/returns";
-import { sale, tender } from "./register/sale";
+import { card, sale, tender } from "./register/sale";
 import { laneSelect, opendrawer, signon } from "./register/signon";
 import { audit, auditRow, reasonCodes } from "./screens/audit";
-import { card, customer as customerScreen, customers } from "./screens/customers";
+import { customer as customerScreen, customers, giftcard } from "./screens/customers";
 import { depts } from "./screens/depts";
 import { employee, employees } from "./screens/employees";
 import { closeDay, days, zreport } from "./screens/endofday";
@@ -46,8 +46,8 @@ const app = createApp<Env>({
 		menu, items, item, depts, prices, promotions, promotion, coupons, coupon, stores, store, registers, employees, employee,
 		stock, ledger: stockLedger, adjust: adjustStock, counts, count, transfers, transfer,
 		vendors, vendor, pos, po, suggested, reorder, vreturn: vendorReturn, closeday: closeDay, days, zreport, timecards, timecard, schedule,
-		customers, custfile: customerScreen, card, audit, auditrow: auditRow, reasons: reasonCodes,
-		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
+		customers, custfile: customerScreen, giftcard, audit, auditrow: auditRow, reasons: reasonCodes,
+		lane: laneSelect, signon, opendrawer, sale, tender, card, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve, discount,
 		return: returnPanel, customer, gift, resume: resumePanel,
 	},
 	// People sign on through Cloudflare Access as their userid. A register
@@ -107,8 +107,8 @@ const app = createApp<Env>({
 		"custfile.phone": { title: "PHONE", lines: ["Ten digits. The register finds a customer by it, so no two", "customers share one."] },
 		"custfile.exempt": { title: "TAX EXEMPT", lines: ["Y if the customer's purchases carry no sales tax. Key their", "certificate number too."], values: yesNo },
 		"custfile.status": { title: "STATUS", lines: ["An inactive customer isn't found at the register."], values: values(["A", "ACTIVE"], ["I", "INACTIVE"]) },
-		"card.card": { title: "CARD NUMBER", lines: ["A gift card's 8 to 19 digits, or a store credit number: SC and", "12 digits, as printed on the receipt."] },
-		"card.amount": { title: "ADJUST", lines: ["An amount to add to the balance, e.g. 5.00, or to take off,", "e.g. -5.00. Needs a reason code."] },
+		"giftcard.card": { title: "CARD NUMBER", lines: ["A gift card's 8 to 19 digits, or a store credit number: SC and", "12 digits, as printed on the receipt."] },
+		"giftcard.amount": { title: "ADJUST", lines: ["An amount to add to the balance, e.g. 5.00, or to take off,", "e.g. -5.00. Needs a reason code."] },
 		"audit.action": { title: "ACTION", lines: ["The start of the action: TIME shows every time clock entry,", "SALE.VOID only post-voids. Blank shows everything."] },
 		"audit.before": { title: "ON OR BEFORE", lines: ["Show what happened on or before this day, YYYY-MM-DD.", "Blank is up to now."] },
 		"reasons.kind": { title: "KIND", lines: ["Which reasons to keep."], values: values(["ADJUST", "STOCK ADJUSTMENTS"], ["OVERRIDE", "PRICE OVERRIDES"], ["CARD", "GIFT CARD CHANGES"]) },
@@ -119,8 +119,8 @@ const app = createApp<Env>({
 		"sale.item": { title: "ITEM", lines: ["Scan the barcode, or key the SKU or UPC, and press Enter.", "PF2 shows the price without ringing it."] },
 		"sale.qty": { title: "QTY", lines: ["How many, 1 to 999; blank is 1. For an item sold by weight, the", "pounds from the scale, e.g. 1.25."] },
 		"sale.line": { title: "LINE", lines: ["The line number to void with PF6. Blank voids the last line."] },
-		"tender.method": { title: "METHOD", lines: ["How the customer pays this part."], values: values(["C", "CASH"], ["D", "CARD (RECORDED; RUN IT ON THE CARD TERMINAL)"], ["K", "CHECK"], ["G", "GIFT CARD"], ["S", "STORE CREDIT"]) },
-		"tender.ref": { title: "REFERENCE", lines: ["A card's last 4 digits, a check number, or a gift card or store", "credit number. Refunding to store credit, blank issues a new one."] },
+		"tender.method": { title: "METHOD", lines: ["How the customer pays this part."], values: values(["C", "CASH"], ["D", "CARD, ON THE CARD TERMINAL"], ["K", "CHECK"], ["G", "GIFT CARD"], ["S", "STORE CREDIT"]) },
+		"tender.ref": { title: "REFERENCE", lines: ["A check number, or a gift card or store credit number. Refunding", "to store credit, blank issues a new one. A card needs none: the card", "terminal gives its last 4 and approval code."] },
 		"tender.amount": { title: "AMOUNT", lines: ["How much this part pays, or refunds. Cash may be more than is due:", "the change is shown. Nothing else pays more than is due."] },
 		"functions.option": { title: "OPTION", lines: ["The register function to go to."], values: values(["1", "RECEIPTS"], ["2", "PAID IN"], ["3", "PAID OUT"], ["4", "NO SALE"], ["5", "CLOSE DRAWER"], ["6", "SIGN OFF"],
 			["7", "CUSTOMER"], ["8", "RETURN"], ["9", "GIFT CARD"], ["10", "SUSPEND THE SALE"], ["11", "RESUME A SALE"]) },
@@ -132,7 +132,7 @@ const app = createApp<Env>({
 		"receipts.sel": { title: "SELECTION CODE", lines: ["S shows a receipt to reprint. V voids a paid sale; a supervisor or", "manager approves it with their PIN."], values: values(["S", "SHOW/REPRINT"], ["V", "VOID"]) },
 		"adjust.reason": { title: "REASON", lines: ["Why on hand is changed. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "ADJUST") },
 		"discount.reason": { title: "REASON", lines: ["Why the price is overridden. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "OVERRIDE") },
-		"card.reason": { title: "REASON", lines: ["Why the balance is changed. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "CARD") },
+		"giftcard.reason": { title: "REASON", lines: ["Why the balance is changed. Option 8.4 keeps the codes."], values: (ctx) => reasonValues(ctx.env.DB, "CARD") },
 		"adjust.qty": { title: "CHANGE", lines: ["How many more there are (5) or fewer (-5). Pounds for a weighed", "item, e.g. -1.25."] },
 		"stock.sel": { title: "SELECTION CODE", lines: ["L shows the item's ledger; A adjusts its on hand."], values: values(["L", "LEDGER"], ["A", "ADJUST"]) },
 		"counts.dept": { title: "DEPARTMENT", lines: ["PF5 starts a cycle count of this department's items. Blank counts", "every item."], values: async (ctx) => deptValues(ctx.env.DB) },
