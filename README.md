@@ -45,6 +45,10 @@ orders, reorder points and returns to vendors).
 | POS372 | 3.3 SUGGESTED: what a store should order from a vendor; PF10 makes a draft PO | same |
 | POS373 | 3.4 REORDER: min and max per store and item | same |
 | POS380 | 3.5 RETURNS: stock sent back to a vendor | same |
+| POSM05 | 5 END OF DAY | managers (their stores), admins |
+| POS510 | 5.1 CLOSE: a store's business day; once every drawer is closed, PF10 closes it (posts its sales, makes the Z report, moves the store to the next day); PF11 reopens the last closed day (admins) | same |
+| POS520 | 5.2 DAYS: a store's closed days | same |
+| POS521 | Z report: sales, returns, tenders, paid in and out, each drawer's over/short and the deposit slip | same |
 | POS410 | 4 EMPLOYEES: people, roles, userids, operator IDs, stores | admins |
 | POS411 | Employee: add or update | admins |
 | POSM08 | 8 ADMIN | admins |
@@ -53,13 +57,19 @@ orders, reorder points and returns to vendors).
 | POS820 | 8.2 REGISTERS: a store's registers, changed in place, and the service token each enrolled register signs on with | admins |
 | POS200 | R REGISTER: run a register on this terminal | supervisors, managers, admins |
 
-Menu numbers follow the plan (5 END OF DAY, 6 REPORTS and 7 CUSTOMERS
-come later), so fast paths like `=1.3` won't move. Inventory's maps are
-POS31x to POS33x and purchasing's POS36x to POS38x, since the register
-has POS2xx.
+Menu numbers follow the plan (6 REPORTS and 7 CUSTOMERS come later), so
+fast paths like `=1.3` won't move. Inventory's maps are POS31x to POS33x,
+purchasing's POS36x to POS38x and end of day's POS51x to POS52x, since the
+register has POS2xx.
 
 Rules worth knowing:
 
+- **Business day.** Each store has one. A drawer belongs to the day it
+  opened on, and its sales with it. Closing a day runs as a Workflow
+  (`greenscreen-pos-close-day`) and is refused while any drawer is open;
+  after the close the store moves to the next day (or today, if it fell
+  behind). An admin can reopen the last closed day until a drawer opens
+  on the day after.
 - **Roles.** Cloudflare Access says who someone is; the employee file
   (`employees.userid`) gives their role and the stores they're limited to.
   Cashiers and people not on file can't sign on to the back office. Every
@@ -150,6 +160,7 @@ src/index.ts         the app: panels, logon check, field help
 src/access.ts        who is signed on, their role and stores
 src/worker.ts        the Worker's entry: the app, the posting queue and cron, the Sessions Durable Object
 src/posting.ts       posting paid sales to the stock ledger
+src/closeday.ts      the Workflow that closes a store's day
 src/data/*.ts        stores, items, employees, PINs, the register: SQL, validation, audit
 src/screens/*.ts     the back-office panels, one module per group
 src/register/*.ts    the register panels
