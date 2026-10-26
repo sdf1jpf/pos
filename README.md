@@ -137,7 +137,7 @@ Durable Object).
 | POS201 | Start your register: a cashier signed on through Access with their own login picks a register, and signs on to it as themselves, with no operator ID or PIN |
 | POS210 | Sign on: operator ID and 4-digit PIN. Three wrong PINs lock the operator out until an admin sets a new PIN (POS411). PF9 clocks the operator in or out |
 | POS211 | Open the drawer: the float, counted by denomination; PF10 opens it |
-| POS220 | Sale: scan or key a SKU or UPC, a quantity or a weight in pounds. PF2 checks a price, PF6 voids a line, PF12 (twice) voids the sale |
+| POS220 | Sale: scan or key a SKU or UPC; QTY starts at 1, so a scan alone rings one. A weight in pounds for a weighed item. PF2 checks a price, PF6 voids a line, PF10 changes the last line's qty (or LINE's), PF12 (twice) voids the sale |
 | POS227 | Discount (PF9): a percent or amount off a line, a percent off the sale, or a line's price overridden with a reason |
 | POS230 | Tender: cash (with change), card (run on the card terminal), check, gift card or store credit, split as the customer likes. A negative total is refunded: cash, card or store credit |
 | POS231 | Card terminal: the customer inserts, taps or swipes; the terminal gives the card's last 4 and approval code, or declines. Simulated: Enter approves, PF10 declines |
