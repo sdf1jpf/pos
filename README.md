@@ -18,7 +18,10 @@ transfers) and purchasing (vendors, purchase orders, receiving, suggested
 orders, reorder points and returns to vendors). Phase 4 is in-store
 mode: a store server runs the registers on the store's own machine, so a
 store keeps selling when its internet is down (see "In-store mode" below
-and [store/README.md](store/README.md)).
+and [store/README.md](store/README.md)). Phase 5 is polish: demo data with
+two weeks of trading, a Mac app that opens a register or the back office
+from the Dock, and [docs/guide.md](docs/guide.md), a guide to a day at the
+store for cashiers, managers and admins.
 
 ## The back office
 
@@ -232,6 +235,9 @@ src/register/*.ts    the register panels
 migrations/          the D1 schema
 seed.sql             the small fixture the tests use
 seed/sample.sql      fuller sample data: 3 stores, ~50 items, every role
+seed/demo.mjs        demo data on top of it: PINs, stock, customers, two weeks of sales
+scripts/             make-mac-app.sh, the Mac launcher
+docs/guide.md        a day at the store, for cashiers, managers and admins
 store/               the store server: its wrangler config, launcher and settings
 test/                tests against a real (local) D1, through POST /v1/screen
 test/store/          the offline test: a cloud and a store server, the cloud cut off mid-way
@@ -267,6 +273,26 @@ npm run db:migrate:local && npm run db:sample:local
 npm run db:sample:remote                # the deployed database
 ```
 
+On top of the sample, `seed/demo.mjs` adds what a few weeks of trading
+leave behind, so the reports, Z reports, stock ledger and customer file
+have something to show:
+
+- PINs for the sample people with an operator ID: the PIN is the operator
+  ID (cashier 3001's PIN is 3001), set only where there is none yet.
+- Opening stock for every item at every store, counted in.
+- Ten customers, two of them tax exempt, and three gift cards.
+- Two weeks of sales up to yesterday at stores 1 and 2, on two registers
+  each: about 1,300 sales, some card and some cash, a few post-voided,
+  each day's drawers opened and closed in balance. The cron sweep posts
+  them to the stock ledger within a few minutes.
+
+It's safe to run again; a later run adds the days since the last one.
+
+```sh
+npm run db:demo:local
+npm run db:demo:remote                  # the deployed database
+```
+
 ```sh
 npm test            # vitest in workerd, with migrations and seed applied
 npm run typecheck
@@ -274,6 +300,25 @@ npm run typecheck
 
 `.npmrc` sets `legacy-peer-deps`, which npm 10 (the one Node 22 ships) needs
 to install vitest's peers.
+
+## On a Mac
+
+`scripts/make-mac-app.sh` builds a double-clickable app that opens a
+Terminal window running the Go terminal against the POS, so it can live in
+the Dock, Launchpad or Spotlight. It needs Go, and puts the app in
+`~/Applications` (set `DEST` to change that).
+
+```sh
+scripts/make-mac-app.sh                       # "POS Back Office.app": signs on through Access in the browser
+CF_ACCESS_CLIENT_ID=... CF_ACCESS_CLIENT_SECRET=... \
+  scripts/make-mac-app.sh --register LANE1    # "POS LANE1.app": an enrolled register, with its service token
+scripts/make-mac-app.sh --register LANE1 http://store-server:8080   # the same, on a store server
+```
+
+A register app keeps its service token inside the app, readable only by
+you; build it on the register's own Mac. The window uses the Terminal
+profile named by `PROFILE` (default GoTerm) and is 100 by 32. Run the
+script again to pick up a newer client (`GREENSCREEN=v0.2.3` pins it).
 
 ## Deploy
 

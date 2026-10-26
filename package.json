@@ -14,7 +14,9 @@
     "db:sample:remote": "wrangler d1 execute greenscreen-pos --remote --file=seed/sample.sql",
     "test:store": "node test/store/offline.mjs",
     "store": "node store/server.mjs",
-    "store:token": "node store/token.mjs"
+    "store:token": "node store/token.mjs",
+    "db:demo:local": "mkdir -p .wrangler && node seed/demo.mjs > .wrangler/demo.sql && wrangler d1 execute greenscreen-pos --local --file=.wrangler/demo.sql",
+    "db:demo:remote": "mkdir -p .wrangler && node seed/demo.mjs > .wrangler/demo.sql && wrangler d1 execute greenscreen-pos --remote --file=.wrangler/demo.sql"
   },
   "dependencies": {
     "@greenscreen-dev/web": "^0.2.2",
