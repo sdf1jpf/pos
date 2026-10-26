@@ -1,0 +1,35 @@
+name: Load data
+
+# Loads seed/sample.sql or the demo data (seed/demo.mjs) into the deployed
+# database, from the Actions tab: Load data, Run workflow. Both are safe to
+# run again and never change a row that's already there.
+on:
+  workflow_dispatch:
+    inputs:
+      data:
+        description: What to load
+        type: choice
+        options: [demo, sample]
+        default: demo
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    name: Load ${{ inputs.data }} data
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:${{ inputs.data }}:remote

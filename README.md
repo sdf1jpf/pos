@@ -293,6 +293,9 @@ npm run db:demo:local
 npm run db:demo:remote                  # the deployed database
 ```
 
+The deployed database can also be loaded from GitHub: Actions, Load data,
+Run workflow, then pick demo or sample.
+
 ```sh
 npm test            # vitest in workerd, with migrations and seed applied
 npm run typecheck
