@@ -82,11 +82,11 @@ else
 	DISPLAY_START=
 fi
 osacompile -o "$APP" <<APPLESCRIPT
-set run to quoted form of (POSIX path of (path to me) & "Contents/Resources/run")
+set startCmd to quoted form of (POSIX path of (path to me) & "Contents/Resources/run")
 $DISPLAY_START
 tell application "Terminal"
 	activate
-	set t to do script run & "; exit"
+	set t to do script startCmd & "; exit"
 	try
 		set current settings of t to settings set "$PROFILE"
 	end try
