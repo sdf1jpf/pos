@@ -7,10 +7,11 @@ the back office are both green-screen panels, used from the Go terminal or
 the browser terminal.
 
 The plan, in five phases, is the "Greenscreen POS: scope and design" doc.
-This is phase 1, the foundation: the master-data schema, sign-on through
+Phase 1 laid the foundation: the master-data schema, sign-on through
 Cloudflare Access with roles, and the back-office panels for stores,
-registers, items, departments, price books and employees. The register
-comes next.
+registers, items, departments, price books and employees. Phase 2 is the
+register; its core is here (sign-on, drawers, sales, tenders, receipts and
+post-voids), with discounts, returns and the rest to follow.
 
 ## The back office
 
@@ -27,7 +28,8 @@ comes next.
 | POSM08 | 8 ADMIN | admins |
 | POS810 | 8.1 STORES: S shows a store, R its registers | admins |
 | POS811 | Store: address, tax rate, discount limit, receipt header and footer | admins |
-| POS820 | 8.2 REGISTERS: a store's registers, changed in place | admins |
+| POS820 | 8.2 REGISTERS: a store's registers, changed in place, and the service token each enrolled register signs on with | admins |
+| POS200 | R REGISTER: run a register on this terminal | supervisors, managers, admins |
 
 Menu numbers follow the plan (2 INVENTORY, 3 PURCHASING, 5 END OF DAY,
 6 REPORTS and 7 CUSTOMERS come later), so fast paths like `=1.3` won't
@@ -49,13 +51,53 @@ Rules worth knowing:
 - **Money** is in cents; tax rates are in thousandths of a percent (8.25% is
   8250).
 
+## The register
+
+A register is either a terminal enrolled as one (it signs on through
+Access with its own service token, and goes straight to its sign-on
+screen) or any terminal a supervisor or manager turns into one with
+option R. Either way, one terminal at a time runs a register: the
+others are told it is in use (greenscreen's record locks, in the Sessions
+Durable Object).
+
+| Map | Panel |
+| --- | --- |
+| POS210 | Sign on: operator ID and 4-digit PIN. Three wrong PINs lock the operator out until an admin sets a new PIN (POS411) |
+| POS211 | Open the drawer: the float, counted by denomination; PF10 opens it |
+| POS220 | Sale: scan or key a SKU or UPC, a quantity or a weight in pounds. PF2 checks a price, PF6 voids a line, PF12 (twice) voids the sale |
+| POS230 | Tender: cash (with change), card (last 4 and approval code; recorded, not charged) or check, split as the customer likes |
+| POS240 | Receipt, with the receipt number store-register-sale and its barcode text |
+| POS225 | Functions between sales: receipts, paid in, paid out, no sale, close drawer, sign off |
+| POS241 | The register's receipts: S reprints, V voids a paid sale |
+| POS290 | Manager approval: a supervisor's, manager's or admin's operator ID and PIN |
+| POS250 | Close the drawer: counted blind, then expected, over/short, card and check totals |
+
+Rules worth knowing:
+
+- **A sale is written once, whole,** when it is paid for or voided, with
+  its lines, tenders and audit rows in one transaction. Each sale carries
+  a token made when it started, so a key pressed twice can't write it
+  twice.
+- **Drawers.** One open drawer per register, shared by the operators who
+  sign on to it. It should hold its float, plus cash taken, plus paid in,
+  less paid out; a post-voided sale no longer counts.
+- **Tax** is the store's rate on the taxable lines, rounded once per sale.
+- **Quantities** are kept in thousandths, so a pound and a half of apples
+  is 1500 and two mugs are 2000.
+- **Enrolling a register:** create a service token in Cloudflare Zero
+  Trust, add it to the Access application's Service Auth policy, and key
+  its client ID beside the register on POS820. The terminal on that lane
+  then signs on with the token.
+
 ## Layout
 
 ```
 src/index.ts         the app: panels, logon check, field help
 src/access.ts        who is signed on, their role and stores
-src/data/*.ts        stores, items, employees: SQL, validation, audit
-src/screens/*.ts     one module per panel group
+src/worker.ts        the Worker's entry: the app and the Sessions Durable Object
+src/data/*.ts        stores, items, employees, PINs, the register: SQL, validation, audit
+src/screens/*.ts     the back-office panels, one module per group
+src/register/*.ts    the register panels
 migrations/          the D1 schema
 seed.sql             the small fixture the tests use
 seed/sample.sql      fuller sample data: 3 stores, ~50 items, every role
@@ -73,8 +115,10 @@ npm run dev                             # http://localhost:8787
 
 Open http://localhost:8787 for the browser terminal, or run the Go terminal:
 `go run github.com/sdf1jpf/greenscreen/cmd/greenscreen@latest -api http://localhost:8787`.
-The seed has users `BUYER`, `MANAGER` (store 2 only) and `CASHIER`; set
-`DEV_USER` in `.dev.vars` to try each role.
+The seed has users `BUYER`, `MANAGER` (store 2 only), `SUPER` (a
+supervisor at store 1) and `CASHIER`; set `DEV_USER` in `.dev.vars` to try
+each role. At the register, operators 3001 and 3002 (cashiers at store 1),
+4001 (the supervisor) and 2001 (the store 2 manager) all have PIN 1234.
 
 For something closer to a real chain, load `seed/sample.sql` into an empty
 database instead of `seed.sql`: three stores with ten registers, nine

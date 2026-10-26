@@ -1,5 +1,5 @@
 -- Sample master data for local development and the tests: two stores, a
--- few departments and items, and one person in each role.
+-- few departments and items, and people in each role.
 
 INSERT INTO stores (store, name, addr1, city, state, zip, phone, tax_rate, discount_limit, header1, footer1, updated_at, updated_by) VALUES
 	(1, 'MAIN STREET', '100 MAIN ST', 'DAYTON', 'OH', '45402', '937-555-0100', 7250, 10, 'MAIN STREET MARKET', 'THANK YOU FOR SHOPPING', '2026-10-26T00:00:00Z', 'SEED'),
@@ -27,9 +27,12 @@ INSERT INTO items (sku, upc, descr, dept, class, vendor, cost, price, taxable, w
 INSERT INTO prices (store, sku, price, updated_at, updated_by) VALUES
 	(2, '100100', 849, '2026-10-26T00:00:00Z', 'SEED');
 
-INSERT INTO employees (emp, name, role, userid, operator, updated_at, updated_by) VALUES
-	(1, 'PAT BUYER', 'BUYER', 'BUYER', NULL, '2026-10-26T00:00:00Z', 'SEED'),
-	(2, 'MO MANAGER', 'MANAGER', 'MANAGER', '2001', '2026-10-26T00:00:00Z', 'SEED'),
-	(3, 'CASEY CASHIER', 'CASHIER', 'CASHIER', '3001', '2026-10-26T00:00:00Z', 'SEED');
+-- Everyone with an operator ID has register PIN 1234.
+INSERT INTO employees (emp, name, role, userid, operator, pin_hash, updated_at, updated_by) VALUES
+	(1, 'PAT BUYER', 'BUYER', 'BUYER', NULL, NULL, '2026-10-26T00:00:00Z', 'SEED'),
+	(2, 'MO MANAGER', 'MANAGER', 'MANAGER', '2001', 'pbkdf2$100000$Z3JlZW5zY3JlZW5zZWVkMQ==$gMeF2UizBDbVcgJmE6vDB34EFhByZU7Qu+uthx1b3Ug=', '2026-10-26T00:00:00Z', 'SEED'),
+	(3, 'CASEY CASHIER', 'CASHIER', 'CASHIER', '3001', 'pbkdf2$100000$Z3JlZW5zY3JlZW5zZWVkMQ==$gMeF2UizBDbVcgJmE6vDB34EFhByZU7Qu+uthx1b3Ug=', '2026-10-26T00:00:00Z', 'SEED'),
+	(4, 'SAM SUPERVISOR', 'SUPERVISOR', 'SUPER', '4001', 'pbkdf2$100000$Z3JlZW5zY3JlZW5zZWVkMQ==$gMeF2UizBDbVcgJmE6vDB34EFhByZU7Qu+uthx1b3Ug=', '2026-10-26T00:00:00Z', 'SEED'),
+	(5, 'RILEY CASHIER', 'CASHIER', NULL, '3002', 'pbkdf2$100000$Z3JlZW5zY3JlZW5zZWVkMQ==$gMeF2UizBDbVcgJmE6vDB34EFhByZU7Qu+uthx1b3Ug=', '2026-10-26T00:00:00Z', 'SEED');
 
-INSERT INTO employee_stores (emp, store) VALUES (2, 2), (3, 1);
+INSERT INTO employee_stores (emp, store) VALUES (2, 2), (3, 1), (4, 1), (5, 1);

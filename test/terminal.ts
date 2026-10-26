@@ -39,3 +39,13 @@ export const text = (r: Reply) => (r.screen?.fields ?? []).map((f) => f.text ?? 
 export const value = (r: Reply, name: string) => r.screen?.fields.find((f) => f.name === name)?.value ?? "";
 
 export const map = (r: Reply) => r.screen?.map;
+
+// grid draws the screen as 24 lines of text, to look at or match.
+export function grid(r: Reply, rows = 24, cols = 80): string {
+	const g = Array.from({ length: rows }, () => Array(cols).fill(" "));
+	for (const f of r.screen?.fields ?? []) {
+		const s = f.name ? (f.value ?? "").padEnd(1, "_") : (f.text ?? "");
+		for (let i = 0; i < s.length && f.col - 1 + i < cols; i++) g[f.row - 1][f.col - 1 + i] = s[i];
+	}
+	return g.map((l) => l.join("").trimEnd()).join("\n");
+}

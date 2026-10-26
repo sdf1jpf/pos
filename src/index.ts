@@ -2,10 +2,17 @@
 // Cloudflare Workers and D1. Every screen is a panel in src/screens; the
 // data they keep is in src/data; @greenscreen-dev/worker does the rest.
 
-import { createApp, helpTable, msgId, time, values } from "@greenscreen-dev/worker";
+import { accessAuth, createApp, helpTable, msgId, time, userIdFor, values } from "@greenscreen-dev/worker";
+import { tso } from "@greenscreen-dev/worker/sessions";
 import { who } from "./access";
 import { listDepartments } from "./data/items";
+import { registerForToken } from "./data/register";
 import type { Env } from "./env";
+import { signOn } from "./register/common";
+import { closedrawer, functions, paid } from "./register/drawer";
+import { approve, receiptPanel, receipts } from "./register/receipt";
+import { sale, tender } from "./register/sale";
+import { laneSelect, opendrawer, signon } from "./register/signon";
 import { depts } from "./screens/depts";
 import { employee, employees } from "./screens/employees";
 import { item, items } from "./screens/items";
@@ -24,9 +31,19 @@ const app = createApp<Env>({
 		system: "POS1",
 		banner: ["GREENSCREEN POINT OF SALE", "BACK OFFICE"],
 	},
-	programs: { menu, items, item, depts, prices, stores, store, registers, employees, employee },
-	// Only people on the employee file (or in ADMIN_USERS) get past logon.
+	programs: {
+		menu, items, item, depts, prices, stores, store, registers, employees, employee,
+		lane: laneSelect, signon, opendrawer, sale, tender, receipt: receiptPanel, receipts, functions, paid, closedrawer, approve,
+	},
+	// People sign on through Cloudflare Access as their userid. A register
+	// signs on with its own service token, as the token's client ID.
+	auth: accessAuth<Env>((claims) => (claims.email ? userIdFor(claims) : (claims.common_name ?? "SERVICE").toLowerCase())),
+	// A register enrolled with its service token goes to its sign-on screen.
+	// Otherwise only people on the employee file (or in ADMIN_USERS) get past
+	// logon, to the back office.
 	async start(ctx) {
+		const reg = await registerForToken(ctx.env.DB, ctx.user);
+		if (reg) return signOn(reg.store, reg.reg, "device");
 		if (!(await who(ctx))) {
 			return { logoff: `${msgId(ctx, "0001E")} ${ctx.user} IS NOT AUTHORIZED FOR THE BACK OFFICE - SEE YOUR ADMINISTRATOR` };
 		}
@@ -59,9 +76,22 @@ const app = createApp<Env>({
 				["ADMIN", "EVERYTHING, INCLUDING STORES AND EMPLOYEES"],
 			),
 		},
+		"employee.pin": { title: "REGISTER PIN", lines: ["Four digits the person keys with their operator ID to sign on at a", "register or approve an override. Setting one unlocks someone locked", "out after three wrong PINs. Blank leaves the PIN as it is."] },
+		"lane.store": { title: "STORE", lines: ["The store whose register to run on this terminal."] },
+		"lane.reg": { title: "REGISTER", lines: ["The register to run. Its sales go in its own drawer."] },
+		"signon.operator": { title: "OPERATOR ID", lines: ["The number on your employee record, 3 to 6 digits."] },
+		"sale.item": { title: "ITEM", lines: ["Scan the barcode, or key the SKU or UPC, and press Enter.", "PF2 shows the price without ringing it."] },
+		"sale.qty": { title: "QTY", lines: ["How many, 1 to 999; blank is 1. For an item sold by weight, the", "pounds from the scale, e.g. 1.25."] },
+		"sale.line": { title: "LINE", lines: ["The line number to void with PF6. Blank voids the last line."] },
+		"tender.method": { title: "METHOD", lines: ["How the customer pays this part."], values: values(["C", "CASH"], ["D", "CARD (RECORDED; RUN IT ON THE CARD TERMINAL)"], ["K", "CHECK"]) },
+		"tender.amount": { title: "AMOUNT", lines: ["How much this part pays. Cash may be more than is due: the change", "is shown. A card or check pays at most what is due."] },
+		"functions.option": { title: "OPTION", lines: ["The register function to go to."], values: values(["1", "RECEIPTS"], ["2", "PAID IN"], ["3", "PAID OUT"], ["4", "NO SALE"], ["5", "CLOSE DRAWER"], ["6", "SIGN OFF"]) },
+		"receipts.sel": { title: "SELECTION CODE", lines: ["S shows a receipt to reprint. V voids a paid sale; a supervisor or", "manager approves it with their PIN."], values: values(["S", "SHOW/REPRINT"], ["V", "VOID"]) },
 		"employee.stores": { title: "STORES", lines: ["The store numbers the person works at, separated by commas.", "Blank means every store."] },
 	}),
 	stateKey: (env) => env.STATE_KEY,
+	// Sessions and record locks: a register runs on one terminal at a time.
+	sessions: (env) => (env.SESSIONS ? tso(env.SESSIONS) : undefined),
 });
 
 async function deptValues(db: D1Database) {

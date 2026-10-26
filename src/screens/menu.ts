@@ -19,6 +19,7 @@ const ALL: Record<string, { map: string; title: string; options: Opt[]; hint?: s
 			{ key: "1", name: "PRODUCTS", desc: "Items, depts, prices", aliases: ["P"], sub: "1" },
 			{ key: "4", name: "EMPLOYEES", desc: "People and roles", aliases: ["E"], right: "employees", go: go("employees") },
 			{ key: "8", name: "ADMIN", desc: "Stores and registers", aliases: ["A"], sub: "8" },
+			{ key: "R", name: "REGISTER", desc: "Run a register on this terminal", right: "register", go: go("lane") },
 			{ key: "X", name: "EXIT", desc: "Log off", go: (ctx) => logoff(ctx) },
 		],
 	},
@@ -58,7 +59,7 @@ const built = new Map<string, ReturnType<typeof menuProgram<Env>>>();
 
 async function menuOf(ctx: PosCtx) {
 	const w = await who(ctx);
-	const rights = (["items", "prices", "stores", "employees"] as const).filter((r) => can(w, r));
+	const rights = (["items", "prices", "stores", "employees", "register"] as const).filter((r) => can(w, r));
 	const key = rights.join(",");
 	let m = built.get(key);
 	if (!m) {

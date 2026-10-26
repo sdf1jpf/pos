@@ -20,14 +20,15 @@ export type Right =
 	| "items" // keep the item master and departments
 	| "prices" // keep store price books
 	| "stores" // keep stores and registers
-	| "employees"; // keep employees and their roles
+	| "employees" // keep employees and their roles
+	| "register"; // run a register from the back office
 
 const RIGHTS: Record<Role, Right[]> = {
 	CASHIER: [],
-	SUPERVISOR: [],
-	MANAGER: ["prices"],
+	SUPERVISOR: ["register"],
+	MANAGER: ["prices", "register"],
 	BUYER: ["items", "prices"],
-	ADMIN: ["items", "prices", "stores", "employees"],
+	ADMIN: ["items", "prices", "stores", "employees", "register"],
 };
 
 export function can(who: Who | undefined, right: Right): boolean {

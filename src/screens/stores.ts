@@ -153,7 +153,7 @@ export const registers = guarded("stores", panel<RegistersState, Env>({
 			scr.input(5, 16, 2, "reg", "", { numeric: true, bright: s.errField === "reg" });
 			label(scr, 5, 20, "NAME ===>");
 			scr.input(5, 30, 20, "name", "", { bright: s.errField === "name" });
-			scr.text(6, 2, "REG  NAME                  ST", { color: "white", bright: true });
+			scr.text(6, 2, "REG  NAME                  ST  SERVICE TOKEN CLIENT ID (ENROLLED REGISTER)", { color: "white", bright: true });
 			rule(scr, 7);
 			const regs = await listRegisters(ctx.env.DB, st.store);
 			const rows = listRows(ctx);
@@ -169,6 +169,7 @@ export const registers = guarded("stores", panel<RegistersState, Env>({
 				scr.text(row, 2, String(r.reg).padStart(2, "0"), { color: "turquoise" });
 				scr.input(row, 7, 20, `name:${r.reg}`, r.name, { bright: s.errField === `name:${r.reg}` });
 				scr.input(row, 29, 1, `st:${r.reg}`, r.status, { bright: s.errField === `st:${r.reg}` });
+				scr.input(row, 33, 39, `tok:${r.reg}`, r.token, { bright: s.errField === `tok:${r.reg}` });
 			});
 		} else {
 			scr.text(FIRST, 2, "ENTER A STORE NUMBER TO SEE ITS REGISTERS", { color: "blue" });
@@ -213,11 +214,11 @@ export const registers = guarded("stores", panel<RegistersState, Env>({
 				saved++;
 			}
 			for (const key of s.keys ?? []) {
-				if (!inp.modified.has(`name:${key}`) && !inp.modified.has(`st:${key}`)) continue;
+				if (!["name", "st", "tok"].some((f) => inp.modified.has(`${f}:${key}`))) continue;
 				try {
-					await updateRegister(ctx.env.DB, ctx.user, store, Number(key), inp.fields[`name:${key}`] ?? "", inp.fields[`st:${key}`] ?? "");
+					await updateRegister(ctx.env.DB, ctx.user, store, Number(key), inp.fields[`name:${key}`] ?? "", inp.fields[`st:${key}`] ?? "", inp.fields[`tok:${key}`] ?? "");
 				} catch (e) {
-					if (e instanceof Invalid) throw new Invalid(`${e.field === "status" ? "st" : "name"}:${key}`, `REGISTER ${key}: ${e.message}`);
+					if (e instanceof Invalid) throw new Invalid(`${e.field === "status" ? "st" : e.field === "token" ? "tok" : "name"}:${key}`, `REGISTER ${key}: ${e.message}`);
 					throw e;
 				}
 				saved++;
