@@ -24,10 +24,10 @@
     "hono": "^4.13.14"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.4.7",
+    "@cloudflare/vitest-plugin": "^1.5.1",
     "@cloudflare/workers-types": "^5.20261025.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.12",
-    "wrangler": "^4.152.0"
+    "wrangler": "^4.157.0"
   }
 }
